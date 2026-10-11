@@ -106,6 +106,7 @@ class Runtime:
         *,
         assets_root: str | PathLike[str] | None = None,
         resource_loader: Callable[[str], bytes | Resource | None] | None = None,
+        cache_path: str | PathLike[str] | None = None,
     ) -> Self: ...
     @property
     def closed(self) -> bool: ...

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 CASES = [
+    "cache_path",
     "pixels",
     "transparent",
     "values",
@@ -41,3 +42,8 @@ def test_native_integration(case, tmp_path):
         timeout=20,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_cache_survives_process_restart(tmp_path):
+    for case in ("cache_write", "cache_read"):
+        test_native_integration(case, tmp_path)

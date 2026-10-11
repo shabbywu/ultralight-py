@@ -8,7 +8,7 @@
 
 | 接口 | 返回与约定 |
 | --- | --- |
-| `Runtime(*, assets_root=None, resource_loader=None)` | 每进程共享的 Runtime；目录接受 str/PathLike，loader 返回 bytes、Resource 或 None |
+| `Runtime(*, assets_root=None, resource_loader=None, cache_path=None)` | 每进程共享的 Runtime；目录接受 str/PathLike，loader 返回 bytes、Resource 或 None |
 | `create_view(width, height, *, transparent=False)` | CPU 离屏 View；尺寸为正 uint32，不接受 bool |
 | `update()` | 推进页面加载、脚本和清理；不隐式渲染 |
 | `refresh_display(display_id=0)` | 通知显示刷新，供动画使用 |
@@ -18,6 +18,14 @@
 
 `with Runtime()` 退出即关闭共享实例，因此不要将临时 Runtime 上下文用于一个仍在使用的宿主。
 首次配置被冻结，后续省略参数会复用配置；显式传入不同目录或 loader 会报 ValueError。
+
+`cache_path` 指定 Ultralight 的磁盘缓存及浏览器持久化存储根目录，例如
+`Runtime(cache_path="./cache")`。显式路径在首次初始化时解析为绝对路径，
+不相对于 `assets_root`；接受 str/PathLike，不接受含 NUL 的路径。
+`None` 保留 SDK 默认配置；后续传入 `None` 复用首次配置，不会重置目录。
+相同目录可以重复指定，不同目录报 ValueError。目录由 SDK 按需创建。
+同一 Runtime 的 View 使用默认浏览器 Session，共享存储；该配置不提供账号隔离，
+也不代表应用已验证登录仍然有效。
 
 ## View
 

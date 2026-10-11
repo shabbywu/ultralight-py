@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- Runtime 支持 `cache_path`，配置磁盘缓存及浏览器持久化存储目录，遵循首次初始化冻结规则。
 - 支持 Python 实例和容器实时代理、绑定隔离及撤销。
 - 提供 `Python.to_value()`，将 Python 容器复制为普通 JS Array／Object。
 - 支持 JS Promise 等待、异步求值和调用，以及 Python awaitable 转 JS Promise。

@@ -15,14 +15,16 @@ struct HostRuntime : std::enable_shared_from_this<HostRuntime> {
         if (std::this_thread::get_id() != owner) throw Error(Code::WrongThread, "Operation requires the Python main thread");
         if (require_open && closed) throw Error(Code::Closed, "Runtime is closed");
     }
-    static std::shared_ptr<HostRuntime> create(std::string root, py::object loader) {
+    static std::shared_ptr<HostRuntime> create(std::string root, py::object loader, std::string cache_path) {
         if (in_resource_callback) throw Error(Code::Busy, "Resource callbacks cannot create a Runtime");
         auto threading = py::module_::import("threading");
         if (!threading.attr("current_thread")().is(threading.attr("main_thread")()))
             throw Error(Code::WrongThread, "Runtime must be created on the Python main thread");
         auto host = std::make_shared<HostRuntime>();
         if (!loader.is_none()) host->resources->loader = reference(loader);
-        ulbind17::setup_ultralight_platform();
+        ultralight::Config config;
+        config.cache_path = cache_path.c_str();
+        ulbind17::setup_ultralight_platform(&config);
         using Overlay = ulbind17::resources::FileSystemOverlay<ulbind17::resources::embedded::SDKResources>;
         // Platform stores borrowed pointers; these native-only services survive
         // until process exit, but stop() removes every Python reference.

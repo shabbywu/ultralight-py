@@ -430,6 +430,34 @@ def http():
         thread.join(2)
 
 
+def cache_path():
+    raises(TypeError, lambda: Runtime(cache_path=123))
+    raises(ValueError, lambda: Runtime(cache_path="bad\0path"))
+    directory = Path("browser-cache").resolve()
+    with Runtime(cache_path=Path("browser-cache")) as runtime:
+        assert Runtime() is runtime
+        assert Runtime(cache_path=str(directory)) is runtime
+        raises(ValueError, lambda: Runtime(cache_path="other-cache"))
+        view = runtime.create_view(16, 16)
+        load(runtime, view, "<body>cache")
+        assert not Path("default").exists()
+
+
+def cache_storage():
+    with Runtime(cache_path="persistent-cache") as runtime:
+        view = runtime.create_view(16, 16)
+        ready = []
+        view.set_callbacks(dom_ready=lambda e: ready.append(e) if e.is_main_frame else None)
+        view.load_html("<body>storage", url="http://cache.test/")
+        pump(runtime, lambda: ready)
+        if sys.argv[1] == "cache_write":
+            view.evaluate("localStorage.setItem('persisted', 'from-first-process')")
+        else:
+            assert view.evaluate("localStorage.getItem('persisted')") == "from-first-process"
+    assert Path("persistent-cache/default").is_dir()
+    assert not Path("default").exists()
+
+
 def exit_cleanup():
     runtime = Runtime(resource_loader=lambda path: None)
     view = runtime.create_view(16, 16)
@@ -442,6 +470,9 @@ def exit_cleanup():
 
 
 CASES = {
+    "cache_path": cache_path,
+    "cache_write": cache_storage,
+    "cache_read": cache_storage,
     "pixels": pixels,
     "transparent": transparent,
     "values": values,

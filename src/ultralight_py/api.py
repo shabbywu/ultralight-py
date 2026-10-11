@@ -54,9 +54,12 @@ class Runtime:
 
     _instance: Runtime | None = None
 
-    def __new__(cls, *, assets_root=None, resource_loader=None):
+    def __new__(cls, *, assets_root=None, resource_loader=None, cache_path=None):
         _support.ensure_in_main_thread()
         _callable(resource_loader, "resource_loader")
+        resolved_cache = None if cache_path is None else Path(cache_path).resolve()
+        if resolved_cache is not None and "\0" in str(resolved_cache):
+            raise ValueError("Runtime cache_path cannot contain NUL")
         current = cls._instance
         if current is not None:
             if current.closed:
@@ -67,12 +70,18 @@ class Runtime:
                 raise ValueError("Runtime assets_root is already configured")
             if resource_loader is not None and resource_loader is not current._resource_loader:
                 raise ValueError("Runtime resource_loader is already configured")
+            if cache_path is not None and resolved_cache != current._cache_path:
+                raise ValueError("Runtime cache_path is already configured")
             return current
         self = super().__new__(cls)
         self._assets_root = Path.cwd() if assets_root is None else Path(assets_root).resolve()
         self._resource_loader = resource_loader
+        self._cache_path = resolved_cache
         self._native = _support.call(
-            _native._Runtime.create, str(self._assets_root), resource_loader
+            _native._Runtime.create,
+            str(self._assets_root),
+            resource_loader,
+            "" if resolved_cache is None else str(resolved_cache),
         )
         self._native.set_error_handler(_report)
         cls._instance = self

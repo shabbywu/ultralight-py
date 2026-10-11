@@ -69,6 +69,8 @@ python -m pytest tests -q
 ## 运行时、线程与释放
 
 - `Runtime()` 返回每进程唯一实例，重复调用共享 Renderer。首次调用冻结资源配置；
+  可通过 `Runtime(cache_path="./cache")` 指定磁盘缓存及浏览器持久化存储目录。
+  显式目录解析为绝对路径；默认 `None` 保留 SDK 默认配置，后续省略会复用首次配置。
   后续传入不同的目录或 loader 会报错。`Runtime.close()` 关闭全部 View，关闭后不能重建
   Renderer；日常复用 Runtime，反复创建和关闭 View。上下文管理器退出会执行关闭。
 - Runtime、View、JSValue 的操作和显式关闭只能在 Python 主线程进行。运行时不启动宿主循环；
