@@ -33,13 +33,13 @@ struct HostValue {
     static std::unique_ptr<Bridge::Handle> convert(Bridge &bridge, py::handle value) {
         if (py::isinstance<HostValue>(value)) {
             auto other = value.cast<std::shared_ptr<HostValue>>(); other->checked();
-            // getRetained checks bridge ownership without borrowing a raw cross-document value.
+            // Compare bridge ownership before borrowing a raw document value.
             auto other_owner = other->view.lock();
             bool matches = other_owner->view->WithBridge([&](Bridge &other_bridge) { return &other_bridge == &bridge; });
             if (!matches) throw Error(Code::CrossContext, "JavaScript handle belongs to another document");
             return bridge.retain(other->handle->value());
         }
-        ulbind17::jsc::Traversal walk; return to_js(bridge, value, walk);
+        return to_js(bridge, value);
     }
     void set(py::object key, py::object value) {
         auto name = property_key(key);

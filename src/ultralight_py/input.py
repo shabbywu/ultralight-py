@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import IntEnum, IntFlag
 
 from . import _native
+from ._support import _call
 
 
 class MouseEventType(IntEnum):
@@ -125,7 +126,6 @@ class InputView:
     """Input methods shared by the public View, with no window-framework state."""
 
     def _input_call(self, name, *args):
-        from .api import _call
         return _call(getattr(self._native, name), *args)
 
     def fire_mouse_event(self, event: MouseEvent) -> None:
@@ -153,12 +153,10 @@ class InputView:
 
     @property
     def has_focus(self) -> bool:
-        from .api import _call
         return _call(lambda: self._native.has_focus)
 
     @property
     def has_input_focus(self) -> bool:
-        from .api import _call
         return _call(lambda: self._native.has_input_focus)
 
     def mouse_move(self, x: int, y: int, *, button: MouseButton = MouseButton.NONE) -> None:

@@ -1,7 +1,7 @@
 #pragma once
-#include "../javascript/objects/operators.hpp"
+#include "../javascript/objects/document.hpp"
 namespace binding {
-// View evaluation and Python function binding connect View with JSValue.
+// View evaluation and object binding connect View with JSValue.
 inline std::shared_ptr<HostValue> HostView::evaluate(std::string source) {
     check(); auto self = shared_from_this();
     return view->WithBridge([&](Bridge &bridge) {
@@ -33,9 +33,6 @@ inline std::shared_ptr<objects::Session> HostView::bind_object(std::string name,
         doc->bindings[name] = scope;
         return scope;
     });
-}
-inline std::shared_ptr<objects::Session> HostView::bind_function(std::string name, py::object callback) {
-    return bind_object(std::move(name), std::move(callback), py::none());
 }
 inline void HostView::unbind(std::string name) {
     check();

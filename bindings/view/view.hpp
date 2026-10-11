@@ -10,13 +10,7 @@ struct HostView : std::enable_shared_from_this<HostView> {
     std::weak_ptr<HostRuntime> runtime;
     bool closed = false;
     void check(bool require_open = true) const;
-    void close() {
-        check(false);
-        if (closed) return;
-        // mark before cancellation/host finalizers can reenter
-        closed = true;
-        { py::gil_scoped_release release; view->Close(); view.reset(); }
-    }
+    void close();
     void defer_close() {
         auto self = shared_from_this();
         auto &queue = cleanup();
@@ -66,7 +60,6 @@ struct HostView : std::enable_shared_from_this<HostView> {
     }
     std::shared_ptr<HostValue> evaluate(std::string source);
     std::shared_ptr<objects::Session> bind_object(std::string name, py::object value, py::object members);
-    std::shared_ptr<objects::Session> bind_function(std::string name, py::object callback);
     void unbind(std::string name);
 };
 } // namespace binding

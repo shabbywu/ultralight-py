@@ -5,6 +5,8 @@ import inspect
 import operator
 import types
 
+from ._support import _call
+
 
 def _members(value, allowed=None):
     names = set()
@@ -97,11 +99,9 @@ class PythonBinding:
         return self._native.closed
 
     def close(self) -> None:
-        from .api import _call
         _call(self._native.close)
 
     def __enter__(self) -> PythonBinding:
-        from .api import _call
         _call(self._native.check)
         return self
 

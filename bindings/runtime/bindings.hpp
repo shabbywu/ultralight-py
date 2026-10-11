@@ -9,7 +9,6 @@ inline void register_runtime(py::module_ &module) {
           host.check();
           { py::gil_scoped_release release; host.runtime->Update(); }
           host.flush_errors();
-          std::erase_if(host.views, [](auto &view) { return view->closed; });
       })
       .def("refresh_display", [](HostRuntime &host, uint32_t display) {
           host.check(); py::gil_scoped_release release; host.runtime->RefreshDisplay(display);

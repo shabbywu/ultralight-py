@@ -4,12 +4,12 @@ from __future__ import annotations
 import atexit
 from dataclasses import dataclass
 from pathlib import Path
-import threading
 from typing import Callable, Sequence
 
 from . import _native
 from .input import InputView
-from .objects import PythonBinding
+from ._support import _call, _main_thread
+from .objects import PythonBinding, _members
 
 UltralightError = _native.UltralightError
 JavaScriptError = _native.JavaScriptError
@@ -18,19 +18,6 @@ Resource = _native.Resource
 FrameEvent = _native.FrameEvent
 LoadFailure = _native.LoadFailure
 undefined = _native.undefined
-
-
-def _main_thread() -> None:
-    if threading.current_thread() is not threading.main_thread():
-        raise _native._make_error(ErrorCode.WrongThread, "Operation requires the Python main thread")
-
-
-def _call(function, *args):
-    _main_thread()
-    try:
-        return function(*args)
-    finally:
-        _native._drain()
 
 
 def _report(error: UltralightError) -> None:
@@ -141,11 +128,11 @@ class View(InputView):
     def resize(self, width: int, height: int) -> None:
         _call(self._native.resize, _dimension(width), _dimension(height))
 
-    def set_callbacks(self, **callbacks) -> None:
-        allowed = {"begin_loading", "window_ready", "dom_ready", "finish_loading", "fail_loading", "console"}
-        unknown = callbacks.keys() - allowed
-        if unknown:
-            raise TypeError(f"Unknown callbacks: {', '.join(sorted(unknown))}")
+    def set_callbacks(self, *, begin_loading=None, window_ready=None, dom_ready=None,
+                      finish_loading=None, fail_loading=None, console=None) -> None:
+        callbacks = dict(begin_loading=begin_loading, window_ready=window_ready,
+                         dom_ready=dom_ready, finish_loading=finish_loading,
+                         fail_loading=fail_loading, console=console)
         for name, callback in callbacks.items():
             _callable(callback, name)
         _call(self._native.set_callbacks, callbacks)
@@ -159,7 +146,6 @@ class View(InputView):
 
     def bind_object(self, name: str, instance: object, *,
                     members: Sequence[str] | None = None) -> PythonBinding:
-        from .objects import PythonBinding, _members
         if not isinstance(name, str):
             raise TypeError("Binding name must be str")
         if members is not None:
@@ -180,12 +166,7 @@ class View(InputView):
     def bind_function(self, name: str, callback: Callable) -> PythonBinding:
         if not callable(callback):
             raise TypeError("callback must be callable")
-        from .objects import PythonBinding
-        if not isinstance(name, str):
-            raise TypeError("Binding name must be str")
-        def invoke(*args, **kwargs):
-            return _unwrap(callback(*args, **kwargs))
-        return PythonBinding(_call(self._native.bind_function, name, invoke))
+        return self.bind_object(name, callback)
 
     def copy_pixels(self) -> PixelBuffer:
         return PixelBuffer(**_call(self._native.copy_pixels))
@@ -225,17 +206,13 @@ class JSValue:
         return JSValue(_call(self._native.get, key))
 
     def set(self, key: str | int, value) -> None:
-        _call(self._native.set, key, _unwrap(value))
+        _call(self._native.set, key, value)
 
     def keys(self) -> list[str]:
         return _call(self._native.keys)
 
     def call(self, *args, this: JSValue | None = None) -> JSValue:
-        _main_thread()
-        try:
-            return JSValue(self._native.call(*(_unwrap(arg) for arg in args), this=_unwrap(this)))
-        finally:
-            _native._drain()
+        return JSValue(_call(self._native.call, *args, this=this))
 
     def to_python(self):
         return _call(self._native.to_python)
@@ -251,10 +228,6 @@ class JSValue:
 
     def __exit__(self, *exc) -> None:
         self.close()
-
-
-def _unwrap(value):
-    return value._native if isinstance(value, JSValue) else value
 
 
 def _shutdown() -> None:

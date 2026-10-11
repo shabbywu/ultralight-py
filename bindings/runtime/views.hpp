@@ -1,6 +1,7 @@
 #pragma once
 #include "runtime.hpp"
 #include "../view/view.hpp"
+#include <algorithm>
 namespace binding {
 // Runtime/View ownership and thread checks require both types to be complete.
 inline void HostView::check(bool require_open) const {
@@ -8,6 +9,17 @@ inline void HostView::check(bool require_open) const {
     if (!host) throw Error(Code::Closed, "Runtime is closed");
     host->check(false);
     if (require_open && (closed || host->closed)) throw Error(Code::Closed, "View is closed");
+}
+
+inline void HostView::close() {
+    check(false);
+    if (closed) return;
+    // Keep this wrapper alive while removing Runtime's ownership, including
+    // deferred close and callbacks that close their own View.
+    auto self = shared_from_this();
+    closed = true;
+    if (auto host = runtime.lock()) std::erase(host->views, self);
+    { py::gil_scoped_release release; view->Close(); view.reset(); }
 }
 
 inline std::shared_ptr<HostView> HostRuntime::create_view(uint32_t width, uint32_t height, bool transparent) {

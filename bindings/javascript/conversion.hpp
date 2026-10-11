@@ -59,7 +59,7 @@ inline void set_property(Bridge &bridge, JSValueRef target, std::string_view nam
 }
 
 std::optional<py::object> proxy_from_js(Bridge &, JSValueRef);
-std::unique_ptr<Bridge::Handle> to_js(Bridge &, py::handle, ulbind17::jsc::Traversal &);
+std::unique_ptr<Bridge::Handle> to_js(Bridge &, py::handle);
 
 inline py::object from_js(Bridge &bridge, JSValueRef value, ulbind17::jsc::Traversal &walk) {
     auto ctx = bridge.context();

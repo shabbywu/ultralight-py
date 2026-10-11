@@ -1,5 +1,5 @@
 #pragma once
-#include "objects/operators.hpp"
+#include "objects/document.hpp"
 namespace binding {
 inline void register_javascript(py::module_ &module) {
   py::class_<objects::Session, std::shared_ptr<objects::Session>>(module, "_PythonBinding")

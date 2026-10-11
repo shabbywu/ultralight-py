@@ -172,6 +172,17 @@ def conversion():
         assert counter.values[-1] == 9
         view.bind_function("keyword", lambda *, value: value)
         assert view.evaluate("Python.call(keyword,[],{value:42})") == 42
+        # bind_function preserves callable identity and native JSValue conversion.
+        class CallableModel:
+            def __call__(self): return self
+        callable_model = CallableModel()
+        view.bind_function("callable_model", callable_model)
+        assert view.evaluate("callable_model") is callable_model
+        assert view.evaluate("callable_model()===callable_model")
+        with view.evaluate_handle("({answer:42})") as script:
+            binding = view.bind_function("get_script", lambda: script)
+            assert view.evaluate("get_script().answer") == 42
+            binding.close()
         async def async_value(): return 1
         view.bind_function("async_value", async_value)
         raises(JavaScriptError, lambda: view.evaluate("async_value()"))

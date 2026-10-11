@@ -1,12 +1,12 @@
 #pragma once
 #include "../value.hpp"
-#include "factory.hpp"
 #include <map>
-#include <algorithm>
 #include <atomic>
 namespace binding::objects {
 struct Document;
 struct Session;
+// Accessed on the document owner thread; payloads only carry weak references.
+inline std::map<Bridge *, std::weak_ptr<Document>> documents;
 struct Node {
     Ref object;
     Ref members;
@@ -33,11 +33,14 @@ struct Session : std::enable_shared_from_this<Session> {
 };
 struct Document : std::enable_shared_from_this<Document> {
     std::weak_ptr<Bridge> bridge;
+    Bridge *registry_key = nullptr;
     Ref policy;
     std::unique_ptr<Bridge::Handle> factory;
     std::shared_ptr<Session> implicit;
     std::map<std::string, std::shared_ptr<Session>> bindings;
     ~Document() {
+        auto entry = documents.find(registry_key);
+        if (entry != documents.end() && entry->second.expired()) documents.erase(entry);
         if (implicit) implicit->invalidate();
         for (auto &[name, session] : bindings) session->invalidate();
     }
@@ -62,7 +65,6 @@ struct Document : std::enable_shared_from_this<Document> {
         return without_gil([&] { return b.retain(b.call(JSValueToObject(b.context(), fn->value(), nullptr), args)); });
     }
 };
-inline std::map<Bridge *, std::weak_ptr<Document>> documents;
 inline std::shared_ptr<Document> document(Bridge &);
 inline void Session::check() const {
     if (closed) throw Error(Code::PageGone, "Python binding has been revoked");

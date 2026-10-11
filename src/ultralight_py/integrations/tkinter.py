@@ -5,7 +5,8 @@ from dataclasses import replace
 import tkinter as tk
 from typing import Callable
 
-from ..api import ErrorCode, UltralightError, View, _main_thread
+from ..api import ErrorCode, UltralightError, View
+from .._support import _main_thread
 from ..input import KeyCode, KeyEvent, KeyEventType, Modifiers, MouseButton, _integer
 
 _KEYS = {
