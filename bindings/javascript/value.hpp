@@ -2,6 +2,7 @@
 #include "../view/view.hpp"
 #include "conversion.hpp"
 namespace binding {
+struct PromiseWatch { Ref callback; void close() { callback.reset(); } };
 struct HostValue {
     std::weak_ptr<HostView> view;
     std::unique_ptr<Bridge::Handle> handle;
@@ -59,6 +60,33 @@ struct HostValue {
             { py::gil_scoped_release release; result = bridge.callRetained(*handle, values, this_value.get()); }
             return make(owner, std::move(result));
         });
+    }
+    std::shared_ptr<PromiseWatch> watch(py::object callback) {
+        auto owner = checked();
+        auto slot = std::make_shared<PromiseWatch>(); slot->callback = reference(callback);
+        with([&](Bridge &bridge) {
+            if (!bridge.isPromise(handle->value())) throw py::type_error("await_result requires a Promise");
+            auto weak = bridge.weak_from_this();
+            without_gil([&] { bridge.then(handle->value(),
+                [slot, weak, owner = std::weak_ptr<HostView>(owner)](JSValueRef value, bool rejected) {
+                    py::gil_scoped_acquire gil;
+                    auto cb = std::exchange(slot->callback, {});
+                    if (!cb) return;
+                    auto b = weak.lock();
+                    if (rejected) {
+                        Error error(Code::ScriptException, "Promise rejected");
+                        try { ulbind17::jsc::check(b->context(), value); }
+                        catch (const Error &reason) { error = reason; }
+                        cb->object()(py::none(), error_object(error));
+                    }
+                    else cb->object()(py::cast(make(owner.lock(), b->retain(value))), py::none());
+                }, [slot] {
+                    py::gil_scoped_acquire gil;
+                    auto cb = std::exchange(slot->callback, {});
+                    if (cb) cb->object()(py::none(), error_object(Error(Code::PageGone, "Promise document expired")));
+                }); });
+        });
+        return slot;
     }
     void close() {
         if (auto owner = view.lock()) owner->check(false);

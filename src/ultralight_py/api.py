@@ -80,6 +80,9 @@ class Runtime:
         return View(_call(self._native.create_view, _dimension(width), _dimension(height), transparent))
 
     def update(self) -> None:
+        _main_thread()
+        from .integrations.asyncio import _flush
+        _flush(self)
         _call(self._native.update)
 
     def refresh_display(self, display_id: int = 0) -> None:
@@ -97,6 +100,11 @@ class Runtime:
             _call(self._native.close)
         finally:
             if self.closed:
+                from .integrations.asyncio import _stop
+                _stop(self, _native._make_error(ErrorCode.Closed, "Runtime closed"))
+                driver = getattr(self, "_async_driver", None)
+                if driver is not None:
+                    driver.close()
                 self._resource_loader = None
 
     def __enter__(self) -> Runtime:
@@ -142,6 +150,13 @@ class View(InputView):
 
     def evaluate(self, source: str):
         with self.evaluate_handle(source) as value:
+            return value.to_python()
+
+    async def evaluate_async(self, source: str):
+        with self.evaluate_handle(source) as value:
+            if _call(value._native.is_promise):
+                with await value.await_result() as result:
+                    return result.to_python()
             return value.to_python()
 
     def bind_object(self, name: str, instance: object, *,
@@ -213,6 +228,19 @@ class JSValue:
 
     def call(self, *args, this: JSValue | None = None) -> JSValue:
         return JSValue(_call(self._native.call, *args, this=this))
+
+    async def await_result(self) -> JSValue:
+        from .integrations.asyncio import _await
+        return await _await(self)
+
+    async def call_async(self, *args, this: JSValue | None = None) -> JSValue:
+        result = self.call(*args, this=this)
+        if _call(result._native.is_promise):
+            try:
+                return await result.await_result()
+            finally:
+                result.close()
+        return result
 
     def to_python(self):
         return _call(self._native.to_python)
