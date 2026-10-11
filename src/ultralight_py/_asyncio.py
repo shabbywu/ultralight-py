@@ -5,9 +5,8 @@ from __future__ import annotations
 import asyncio
 import inspect
 
-from ultralight_py import api as _api
-from ultralight_py import _native
 from ultralight_py import _support
+from ultralight_py import api as _api
 
 
 def get_runtime():
@@ -93,12 +92,12 @@ def start(awaitable, delivery):
             if stop not in runtime._async_work:
                 return
             runtime._async_work.discard(stop)
+            error = asyncio.CancelledError() if task.cancelled() else task.exception()
             try:
-                result = task.result()
-            except BaseException as error:
-                delivery.settle(str(error) or type(error).__name__, True)
-            else:
-                delivery.settle(result, False)
+                if error is None:
+                    delivery.settle(task.result(), False)
+                else:
+                    delivery.settle(str(error) or type(error).__name__, True)
             finally:
                 delivery.close()
 

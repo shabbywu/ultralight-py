@@ -1,6 +1,7 @@
 """Python hosts both schedulers; no rendering is required for this example."""
 
 import asyncio
+
 from ultralight_py import Runtime
 from ultralight_py.integrations.asyncio import run
 

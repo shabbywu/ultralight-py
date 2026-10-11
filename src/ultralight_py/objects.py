@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing_extensions import Self
+
 from ultralight_py import _support
 
 
@@ -18,7 +20,7 @@ class PythonBinding:
     def close(self) -> None:
         _support.call(self._native.close)
 
-    def __enter__(self) -> PythonBinding:
+    def __enter__(self) -> Self:
         _support.call(self._native.check)
         return self
 

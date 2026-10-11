@@ -60,7 +60,8 @@ def set_member(value, name, item, allowed):
     if not isinstance(name, str) or name not in members(value, allowed):
         raise AttributeError(f"Python member {name!r} is not exposed")
     descriptor = inspect.getattr_static(value, name)
-    if callable(descriptor) or isinstance(descriptor, (staticmethod, classmethod)):
+    read_only_method = callable(descriptor) or isinstance(descriptor, (staticmethod, classmethod))
+    if read_only_method:
         raise AttributeError(f"Python method {name!r} is read-only")
     if isinstance(descriptor, property) and descriptor.fset is None:
         raise AttributeError(f"Python property {name!r} is read-only")

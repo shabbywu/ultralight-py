@@ -1,8 +1,8 @@
 """Window-independent tests for Tk's platform-specific input translation."""
 
 import gc
-from types import SimpleNamespace
 import weakref
+from types import SimpleNamespace
 
 import pytest
 

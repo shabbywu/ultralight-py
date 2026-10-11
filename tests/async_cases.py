@@ -1,8 +1,12 @@
 import asyncio
+import gc
 import sys
-from ultralight_py import Runtime, JavaScriptError, UltralightError, ErrorCode
-from ultralight_py.integrations.asyncio import install, run
+import weakref
+
 from cases import load
+
+from ultralight_py import ErrorCode, JavaScriptError, Runtime, UltralightError, _native
+from ultralight_py.integrations.asyncio import install, run
 
 runtime = Runtime()
 view = runtime.create_view(16, 16)
@@ -19,9 +23,8 @@ async def main():
         assert "rejected" in str(error)
     else:
         raise AssertionError("rejection lost")
-    with view.evaluate_handle("(x)=>Promise.resolve(x+1)") as fn:
-        with await fn.call_async(4) as result:
-            assert result.to_python() == 5
+    with view.evaluate_handle("(x)=>Promise.resolve(x+1)") as fn, await fn.call_async(4) as result:
+        assert result.to_python() == 5
     with view.evaluate_handle("42") as plain:
         try:
             await plain.await_result()
@@ -82,6 +85,18 @@ async def main():
     assert not shared.cancelled()
     shared.set_result(9)
 
+    cancelled_shared = asyncio.get_running_loop().create_future()
+    view.bind_function("cancelledShared", lambda: cancelled_shared)
+    pending_cancel = asyncio.create_task(view.evaluate_async("cancelledShared()"))
+    await asyncio.sleep(0)
+    cancelled_shared.cancel()
+    try:
+        await pending_cancel
+    except JavaScriptError as error:
+        assert "CancelledError" in str(error)
+    else:
+        raise AssertionError("cancelled Python Future did not reject the JS Promise")
+
     waiting = asyncio.create_task(view.evaluate_async("new Promise(()=>{})"))
     await asyncio.sleep(0)
     waiting.cancel()
@@ -121,8 +136,6 @@ async def manual():
         if pending.done():
             break
     assert await pending == 8
-    import gc
-    import weakref
 
     class Result:
         pass
@@ -130,7 +143,7 @@ async def manual():
     result = Result()
     ref = weakref.ref(result)
     external = asyncio.get_running_loop().create_future()
-    binding = view.bind_function("late", lambda: external)
+    binding = view.bind_function("late", lambda future=external: future)
     view.evaluate_handle("late()").close()
     external.set_result(result)
     await asyncio.sleep(0)
@@ -139,7 +152,6 @@ async def manual():
     runtime.update()
     await asyncio.sleep(0)
     gc.collect()
-    from ultralight_py import _native
 
     _native._drain()
     gc.collect()

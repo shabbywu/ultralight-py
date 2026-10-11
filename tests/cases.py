@@ -1,12 +1,12 @@
 """Each case runs in a new process: the SDK cannot recreate its Renderer."""
 
 import gc
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 import sys
 import threading
 import time
 import weakref
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 from ultralight_py import (
     ErrorCode,
@@ -306,15 +306,16 @@ def resources():
         "virtual.js": b"window.fromPython=42",
         "empty.js": b"",
     }
-    runtime = None
+    active_runtime = None
 
     def loader(path):
         calls.append((path, threading.get_ident()))
-        if runtime is not None:
-            failures.append(raises(UltralightError, runtime.update))
+        if active_runtime is not None:
+            failures.append(raises(UltralightError, active_runtime.update))
         return content.get(path)
 
     with Runtime(assets_root=root, resource_loader=loader) as runtime:
+        active_runtime = runtime
         view = runtime.create_view(16, 16)
         ready, failed = [], []
         view.set_callbacks(
@@ -434,6 +435,7 @@ def exit_cleanup():
     view = runtime.create_view(16, 16)
     view.bind_function("cycle", lambda: view)
     value = view.evaluate_handle("({heldUntilExit:true})")
+    assert not value.closed
     view.load_url("file:///missing.html")
     runtime.update()
     # Deliberately rely on atexit, with retained native and Python references.

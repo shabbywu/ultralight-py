@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import math
-from ultralight_py import _support
-from ultralight_py import _asyncio
-from ultralight_py import _native
+
+from ultralight_py import _asyncio, _native, _support
 
 
 class Driver:
@@ -21,9 +20,10 @@ class Driver:
     def _tick(self):
         if self.closed:
             return
+        # Route every driver failure to run() and revoke cross-language waits.
         try:
             self.runtime.update()
-        except BaseException as error:
+        except BaseException as error:  # noqa: BLE001
             self.failure.set_result(error)
             self.close(error)
             return

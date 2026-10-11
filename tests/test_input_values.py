@@ -6,7 +6,6 @@ from ultralight_py import (
     KeyEvent,
     KeyEventType,
     Modifiers,
-    MouseButton,
     MouseEvent,
     MouseEventType,
     ScrollEvent,

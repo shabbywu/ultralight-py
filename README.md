@@ -335,15 +335,22 @@ python -m venv .venv
 Promise／asyncio 双向桥接与可选定时驱动见 [API 文档](docs/api.md)
 和 [示例](examples/async_bridge.py)。
 
-## Python 代码格式化
+## Python 代码检查与格式化
 
-开发依赖包含固定版本的 Ruff。安装后使用以下命令格式化或检查整个项目：
+开发依赖包含固定版本的 Ruff。lint 与格式检查分别运行：
 
 ```bash
 python -m pip install -e '.[test,dev]'
-python -m ruff format .
+python -m ruff check .
 python -m ruff format --check .
+
+# 自动修复可安全修复的问题并格式化
+python -m ruff check --fix .
+python -m ruff format .
 ```
 
 配置位于 `pyproject.toml`，行宽为 100，使用双引号、空格缩进和 LF 换行。
 格式化包含源码、类型声明、测试及示例，排除 `externals`、`build` 和 `dist`。
+
+`ruff check` 包含未使用导入等代码检查；`ruff format --check` 只检查格式。
+类型声明使用 `typing_extensions.Self`，以保留 Python 3.10 支持。

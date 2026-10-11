@@ -8,6 +8,7 @@ version = "0.3.0"
 description = "Python bindings for Ultralight"
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = ["typing-extensions==4.16.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]

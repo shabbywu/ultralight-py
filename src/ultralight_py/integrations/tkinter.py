@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 import tkinter as tk
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import replace
 
+from ultralight_py import _support, _validation
 from ultralight_py.api import ErrorCode, UltralightError, View
-from ultralight_py import _support
-from ultralight_py import _validation
 from ultralight_py.input import KeyCode, KeyEvent, KeyEventType, Modifiers, MouseButton
 
 _KEYS = {
@@ -104,7 +103,18 @@ _KEYSYM_TEXT = {
 }
 _SHIFTED_DIGITS = dict(
     zip(
-        "exclam at numbersign dollar percent asciicircum ampersand asterisk parenleft parenright".split(),
+        [
+            "exclam",
+            "at",
+            "numbersign",
+            "dollar",
+            "percent",
+            "asciicircum",
+            "ampersand",
+            "asterisk",
+            "parenleft",
+            "parenright",
+        ],
         "1234567890",
     )
 )

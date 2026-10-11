@@ -208,13 +208,13 @@ class MouseEvent:
     type: MouseEventType
     x: int
     y: int
-    button: MouseButton = MouseButton.NONE
+    button: MouseButton = ...
 
 @dataclass(frozen=True)
 class ScrollEvent:
     delta_x: int
     delta_y: int
-    type: ScrollEventType = ScrollEventType.PIXEL
+    type: ScrollEventType = ...
     x: int = -1
     y: int = -1
 
@@ -223,7 +223,7 @@ class KeyEvent:
     type: KeyEventType
     virtual_key_code: int = 0
     native_key_code: int = 0
-    modifiers: Modifiers = Modifiers.NONE
+    modifiers: Modifiers = ...
     key_identifier: str | None = None
     text: str = ""
     unmodified_text: str = ""

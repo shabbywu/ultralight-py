@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import atexit
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence
 
-from ultralight_py import _native
-from ultralight_py import _asyncio
-from ultralight_py import _objects
-from ultralight_py import _support
+from typing_extensions import Self
+
+from ultralight_py import _asyncio, _native, _objects, _support
 from ultralight_py.input import InputView
 from ultralight_py.objects import PythonBinding
 
@@ -116,7 +115,7 @@ class Runtime:
                     driver.close()
                 self._resource_loader = None
 
-    def __enter__(self) -> Runtime:
+    def __enter__(self) -> Self:
         _support.ensure_in_main_thread()
         if self.closed:
             raise _native._make_error(ErrorCode.Closed, "Runtime is closed")
@@ -155,14 +154,14 @@ class View(InputView):
         fail_loading=None,
         console=None,
     ) -> None:
-        callbacks = dict(
-            begin_loading=begin_loading,
-            window_ready=window_ready,
-            dom_ready=dom_ready,
-            finish_loading=finish_loading,
-            fail_loading=fail_loading,
-            console=console,
-        )
+        callbacks = {
+            "begin_loading": begin_loading,
+            "window_ready": window_ready,
+            "dom_ready": dom_ready,
+            "finish_loading": finish_loading,
+            "fail_loading": fail_loading,
+            "console": console,
+        }
         for name, callback in callbacks.items():
             _callable(callback, name)
         _support.call(self._native.set_callbacks, callbacks)
@@ -215,7 +214,7 @@ class View(InputView):
     def close(self) -> None:
         _support.call(self._native.close)
 
-    def __enter__(self) -> View:
+    def __enter__(self) -> Self:
         _support.ensure_in_main_thread()
         if self.closed:
             raise _native._make_error(ErrorCode.Closed, "View is closed")
@@ -270,7 +269,7 @@ class JSValue:
     def close(self) -> None:
         _support.call(self._native.close)
 
-    def __enter__(self) -> JSValue:
+    def __enter__(self) -> Self:
         _support.ensure_in_main_thread()
         if self.closed:
             raise _native._make_error(ErrorCode.PageGone, "JSValue is closed")

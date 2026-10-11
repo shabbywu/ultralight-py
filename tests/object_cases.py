@@ -5,13 +5,15 @@ import sys
 import threading
 import time
 import weakref
+from typing import ClassVar
+
+from cases import load, raises
 
 from ultralight_py import ErrorCode, JavaScriptError, Runtime, UltralightError, undefined
-from cases import load, raises
 
 
 class Counter:
-    shared = []
+    shared: ClassVar[list] = []
 
     def __init__(self, value=0):
         self.value = value

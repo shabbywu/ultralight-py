@@ -5,9 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import IntEnum, IntFlag
 
-from ultralight_py import _native
-from ultralight_py import _support
-from ultralight_py import _validation
+from ultralight_py import _native, _support, _validation
 
 
 class MouseEventType(IntEnum):

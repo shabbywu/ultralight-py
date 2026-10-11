@@ -1,5 +1,6 @@
 import tkinter as tk
-from typing import Callable
+from collections.abc import Callable
+
 from ultralight_py.api import View
 
 class TkInputAdapter:

@@ -153,7 +153,7 @@ def guards():
             try:
                 expect(ErrorCode.WrongThread, lambda: view.click(0, 0))
                 expect(ErrorCode.WrongThread, lambda: view.has_focus)
-            except BaseException as error:
+            except (AssertionError, UltralightError) as error:
                 errors.append(error)
 
         thread = threading.Thread(target=worker)
@@ -232,6 +232,7 @@ def resource_guard():
 
 def tk_window():
     import tkinter as tk
+
     from ultralight_py.integrations.tkinter import TkInputAdapter
 
     root = tk.Tk()

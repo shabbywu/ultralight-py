@@ -1,7 +1,7 @@
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -22,6 +22,7 @@ def test_input_integration(case, tmp_path):
         )
     result = subprocess.run(
         [sys.executable, str(Path(__file__).with_name("input_cases.py")), case],
+        check=False,
         cwd=tmp_path,
         env=env,
         capture_output=True,
