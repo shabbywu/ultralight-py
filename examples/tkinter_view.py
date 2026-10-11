@@ -10,7 +10,8 @@ HTML = """
 <style>body{margin:16px;font:16px sans-serif;background:#fff;color:#222}
 button,input{font:inherit;padding:8px}#scroll{height:200px;overflow:auto;margin-top:16px;border:1px solid #aaa}
 #content{height:1200px;width:1200px;background:linear-gradient(#eee,#9cf)}</style>
-<button onclick="count.textContent=Number(count.textContent)+1">Click</button> Count: <span id=count>0</span>
+<button onclick="leftValue.textContent=left.increment()">Left +1</button>: <span id=leftValue>0</span>
+<button onclick="rightValue.textContent=right.increment()">Right +1</button>: <span id=rightValue>100</span>
 <p><input placeholder="Type here"><span id=typed></span></p>
 <div id=scroll><div id=content>Scroll vertically or Shift-scroll horizontally</div></div>
 <p id=events>Input events appear here</p>
@@ -32,6 +33,17 @@ def ppm(pixels):
     return f"P6\n{pixels.width} {pixels.height}\n255\n".encode() + rgb
 
 
+class Counter:
+    def __init__(self, value):
+        self.value = value
+        self.history = []
+
+    def increment(self):
+        self.value += 1
+        self.history.append(self.value)
+        return self.value
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true", help="Verify display and close automatically")
@@ -43,6 +55,14 @@ def main():
     runtime = Runtime()
     view = runtime.create_view(640, 480)
     adapter = TkInputAdapter(canvas, view)
+    left, right = Counter(0), Counter(100)
+    bindings = []
+
+    def bind_models(event):
+        if event.is_main_frame:
+            bindings[:] = [view.bind_object("left", left), view.bind_object("right", right)]
+
+    view.set_callbacks(window_ready=bind_models)
     view.load_html(HTML)
     item = canvas.create_image(0, 0, anchor="nw")
     state = {"timer": None, "image": None, "closed": False, "frames": 0}
@@ -56,6 +76,8 @@ def main():
             root.after_cancel(state["timer"])
             state["timer"] = None
         adapter.close()
+        for binding in bindings:
+            binding.close()
         view.close()
         runtime.close()
         root.destroy()
@@ -82,7 +104,14 @@ def main():
                     assert image.height() == canvas.winfo_height()
                     assert image.get(0, 0) == (255, 255, 255)
                     assert canvas.itemcget(item, "image")
-                    print("Tk display smoke passed")
+                    view.evaluate("document.querySelectorAll('button')[0].click()")
+                    assert (left.value, right.value) == (1, 100)
+                    assert view.evaluate("leftValue.textContent") == "1"
+                    view.evaluate("document.querySelectorAll('button')[1].click()")
+                    assert (left.value, right.value) == (1, 101)
+                    assert view.evaluate("rightValue.textContent") == "101"
+                    assert view.evaluate("left.history") is left.history
+                    print("Tk display and Python model isolation smoke passed")
                     close()
                     return
                 if time.monotonic() > deadline:
