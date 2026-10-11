@@ -1,3 +1,5 @@
+from .input import (InputView as _InputView, MouseButton as MouseButton, MouseEvent as MouseEvent,
+                    MouseEventType as MouseEventType, ScrollEvent as ScrollEvent, ScrollEventType as ScrollEventType)
 from os import PathLike
 from typing import Any, Callable, TypedDict
 from enum import Enum
@@ -89,7 +91,7 @@ class Runtime:
     def __enter__(self) -> Runtime: ...
     def __exit__(self, *exc: Any) -> None: ...
 
-class View:
+class View(_InputView):
     @property
     def closed(self) -> bool: ...
     def load_html(self, html: str, url: str = "") -> None: ...

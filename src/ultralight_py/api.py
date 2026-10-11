@@ -8,6 +8,7 @@ import threading
 from typing import Callable
 
 from . import _native
+from .input import InputView
 
 UltralightError = _native.UltralightError
 JavaScriptError = _native.JavaScriptError
@@ -120,7 +121,7 @@ class Runtime:
         self.close()
 
 
-class View:
+class View(InputView):
     """An offscreen page. Use close() or a context manager for prompt release."""
 
     def __init__(self, native):
