@@ -184,8 +184,57 @@ def resource_guard():
         assert attempts and view.evaluate('resourceInput') == 42
 
 
+def tk_window():
+    import tkinter as tk
+    from ultralight_py.integrations.tkinter import TkInputAdapter
+    root = tk.Tk()
+    failures = []
+    root.report_callback_exception = lambda kind, error, tb: failures.append(error)
+    canvas = tk.Canvas(root, width=320, height=240, highlightthickness=0, takefocus=True)
+    canvas.pack()
+    root.update()
+    runtime = Runtime()
+    view = page(runtime)
+    existing = []
+    command = canvas.bind('<Configure>', lambda event: existing.append(True), add='+')
+    tags = canvas.bindtags()
+    adapter = TkInputAdapter(canvas, view)
+    weak = weakref.ref(adapter)
+    try:
+        canvas.focus_force(); root.update()
+        canvas.event_generate('<Motion>', x=20, y=20)
+        canvas.event_generate('<ButtonPress-1>', x=20, y=20)
+        canvas.event_generate('<ButtonRelease-1>', x=20, y=20)
+        root.update(); frame(runtime)
+        assert view.evaluate('clicks') == 1
+        canvas.event_generate('<ButtonPress-1>', x=20, y=65)
+        canvas.event_generate('<ButtonRelease-1>', x=20, y=65)
+        canvas.event_generate('<KeyPress>', keysym='a')
+        canvas.event_generate('<KeyRelease>', keysym='a')
+        root.update(); frame(runtime)
+        assert view.evaluate('i.value') == 'a'
+        canvas.event_generate('<Motion>', x=180, y=150)
+        canvas.event_generate('<MouseWheel>', x=180, y=150, delta=-3)
+        pump(runtime, lambda: view.evaluate('area.scrollTop>0'))
+        adapter.close(); adapter.close()
+        assert canvas.bindtags() == tags
+        assert command in canvas.bind('<Configure>')
+        del adapter; gc.collect(); assert weak() is None
+        # Automatic detach while Tcl is destroying the widget must not leave
+        # callback names in the root's command list or keep the View alive.
+        second = TkInputAdapter(canvas, view)
+        second_weak = weakref.ref(second)
+        canvas.destroy(); del second; gc.collect()
+        assert second_weak() is None and not view.closed
+        assert not failures, failures
+    finally:
+        if weak() is not None:
+            weak().close()
+        runtime.close()
+        root.destroy()
+
 
 if __name__ == '__main__':
     {'pointer': pointer, 'keyboard': keyboard, 'guards': guards,
      'close_view': closing, 'close_runtime': lambda: closing(True),
-     'resource_guard': resource_guard}[sys.argv[1]]()
+     'resource_guard': resource_guard, 'tk_window': tk_window}[sys.argv[1]]()

@@ -7,8 +7,12 @@ import pytest
 
 
 @pytest.mark.parametrize('case', ['pointer', 'keyboard', 'guards', 'close_view', 'close_runtime',
-                                  'resource_guard'])
+                                  'resource_guard', 'tk_window'])
 def test_input_integration(case, tmp_path):
+    if case == 'tk_window':
+        pytest.importorskip('tkinter')
+        if sys.platform != 'darwin' and sys.platform != 'win32' and not os.environ.get('DISPLAY'):
+            pytest.skip('Tk window verification requires a desktop')
     env = os.environ.copy()
     if env.get('PYTHONPATH'):
         env['PYTHONPATH'] = os.pathsep.join(str(Path(path).resolve()) for path in env['PYTHONPATH'].split(os.pathsep))
