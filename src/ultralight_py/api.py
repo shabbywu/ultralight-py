@@ -5,10 +5,11 @@ import atexit
 from dataclasses import dataclass
 from pathlib import Path
 import threading
-from typing import Callable
+from typing import Callable, Sequence
 
 from . import _native
 from .input import InputView
+from .objects import PythonBinding
 
 UltralightError = _native.UltralightError
 JavaScriptError = _native.JavaScriptError
@@ -156,12 +157,35 @@ class View(InputView):
         with self.evaluate_handle(source) as value:
             return value.to_python()
 
-    def bind_function(self, name: str, callback: Callable) -> None:
+    def bind_object(self, name: str, instance: object, *,
+                    members: Sequence[str] | None = None) -> PythonBinding:
+        from .objects import PythonBinding, _members
+        if not isinstance(name, str):
+            raise TypeError("Binding name must be str")
+        if members is not None:
+            if isinstance(members, str):
+                raise TypeError("members must be a sequence of public names")
+            members = tuple(members)
+            if any(not isinstance(member, str) or member.startswith("_") for member in members):
+                raise ValueError("members must contain public names")
+            if set(members) - set(_members(instance)):
+                raise ValueError("members contains an unknown Python member")
+        return PythonBinding(_call(self._native.bind_object, name, instance, members))
+
+    def unbind(self, name: str) -> None:
+        if not isinstance(name, str):
+            raise TypeError("Binding name must be str")
+        _call(self._native.unbind, name)
+
+    def bind_function(self, name: str, callback: Callable) -> PythonBinding:
         if not callable(callback):
             raise TypeError("callback must be callable")
-        def invoke(*args):
-            return _unwrap(callback(*args))
-        _call(self._native.bind_function, name, invoke)
+        from .objects import PythonBinding
+        if not isinstance(name, str):
+            raise TypeError("Binding name must be str")
+        def invoke(*args, **kwargs):
+            return _unwrap(callback(*args, **kwargs))
+        return PythonBinding(_call(self._native.bind_function, name, invoke))
 
     def copy_pixels(self) -> PixelBuffer:
         return PixelBuffer(**_call(self._native.copy_pixels))

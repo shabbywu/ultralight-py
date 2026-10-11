@@ -4,6 +4,7 @@
 namespace binding {
 struct HostRuntime;
 struct HostValue;
+namespace objects { struct Session; }
 struct HostView : std::enable_shared_from_this<HostView> {
     std::optional<ulbind17::ManagedView> view;
     std::weak_ptr<HostRuntime> runtime;
@@ -64,6 +65,8 @@ struct HostView : std::enable_shared_from_this<HostView> {
         view->SetCallbacks(std::move(callbacks));
     }
     std::shared_ptr<HostValue> evaluate(std::string source);
-    void bind_function(std::string name, py::object callback);
+    std::shared_ptr<objects::Session> bind_object(std::string name, py::object value, py::object members);
+    std::shared_ptr<objects::Session> bind_function(std::string name, py::object callback);
+    void unbind(std::string name);
 };
 } // namespace binding

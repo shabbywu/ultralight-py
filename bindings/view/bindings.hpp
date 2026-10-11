@@ -24,6 +24,8 @@ inline void register_view(py::module_ &module) {
       .def("set_callbacks", &HostView::callbacks)
       .def("evaluate_handle", &HostView::evaluate)
       .def("bind_function", &HostView::bind_function)
+      .def("bind_object", &HostView::bind_object)
+      .def("unbind", &HostView::unbind)
       .def("copy_pixels", [](HostView &host) {
           host.check(); ulbind17::PixelBuffer pixels;
           { py::gil_scoped_release release; pixels = host.view->CopyPixels(); }

@@ -9,6 +9,7 @@
 - `view/`：View 生命周期、页面事件、加载、像素访问及注册。
 - `input/`：通用鼠标、滚动、键盘和焦点转发，以及事件转换与 GIL 管理。
 - `javascript/`：基础类型转换、保留句柄、属性访问和函数调用及注册。
+- `javascript/objects/`：文档与绑定会话、代理工厂、对象身份及 Python 运算回调。
 
 各目录中的 `bindings.hpp` 提供对应的 `register_*` 入口。
 `runtime/views.hpp` 汇集需要 Runtime 和 View 完整类型的所有权与关闭逻辑；
@@ -19,3 +20,6 @@ Python 引用释放仍由 `python/references.hpp` 的延迟队列执行，
 线程、GIL、文档失效和回调释放规则与公共 Python API 保持一致。
 
 Tkinter 的平台事件转换和控件绑定位于 `src/ultralight_py/integrations/`，不进入原生绑定。
+
+对象成员发现与运算语义位于 `src/ultralight_py/objects.py`；原生层负责会话、GIL、
+句柄和延迟引用释放。JS 代理 payload 仅持有弱引用，文档失效时先撤销会话再释放 Python 引用。

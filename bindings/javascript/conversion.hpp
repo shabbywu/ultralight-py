@@ -1,6 +1,8 @@
 #pragma once
 #include "../common.hpp"
 #include <ulbind17/jsc/Traversal.hpp>
+#include <cmath>
+#include <optional>
 namespace binding {
 struct Undefined {};
 inline PyObject *undefined = nullptr; // borrowed from the module, only used with the GIL
@@ -56,15 +58,24 @@ inline void set_property(Bridge &bridge, JSValueRef target, std::string_view nam
     ulbind17::jsc::check(ctx, exception);
 }
 
+std::optional<py::object> proxy_from_js(Bridge &, JSValueRef);
+std::unique_ptr<Bridge::Handle> to_js(Bridge &, py::handle, ulbind17::jsc::Traversal &);
+
 inline py::object from_js(Bridge &bridge, JSValueRef value, ulbind17::jsc::Traversal &walk) {
     auto ctx = bridge.context();
     auto root = bridge.retain(value);
     if (JSValueIsUndefined(ctx, value)) return py::reinterpret_borrow<py::object>(undefined);
     if (JSValueIsNull(ctx, value)) return py::none();
     if (JSValueIsBoolean(ctx, value)) return py::bool_(bridge.readBoolean(value));
-    if (JSValueIsNumber(ctx, value)) return py::float_(bridge.readNumber(value));
+    if (JSValueIsNumber(ctx, value)) {
+        auto number = bridge.readNumber(value);
+        if (std::isfinite(number) && std::abs(number) <= 9007199254740991.0 && std::trunc(number) == number && !(number == 0 && std::signbit(number)))
+            return py::int_(static_cast<long long>(number));
+        return py::float_(number);
+    }
     if (JSValueIsString(ctx, value)) return py::str(bridge.readString(value));
     if (!JSValueIsObject(ctx, value)) throw py::type_error("JavaScript value requires a JSValue handle");
+    if (auto proxy = proxy_from_js(bridge, value)) return *proxy;
     auto object = JSValueToObject(ctx, value, nullptr);
     if (JSObjectIsFunction(ctx, object) || bridge.isPromise(value))
         throw py::type_error("Functions and Promises require a JSValue handle");
@@ -96,7 +107,7 @@ inline py::object from_js(Bridge &bridge, JSValueRef value, ulbind17::jsc::Trave
     }
     return std::move(result);
 }
-inline std::unique_ptr<Bridge::Handle> to_js(Bridge &bridge, py::handle value,
+inline std::unique_ptr<Bridge::Handle> copy_to_js(Bridge &bridge, py::handle value,
                                           ulbind17::jsc::Traversal &walk) {
     if (value.ptr() == undefined) return bridge.retain(bridge.makeUndefined());
     if (value.is_none()) return bridge.retain(bridge.makeNull());
@@ -123,7 +134,7 @@ inline std::unique_ptr<Bridge::Handle> to_js(Bridge &bridge, py::handle value,
         auto array = bridge.retain(bridge.makeArray());
         uint32_t index = 0;
         for (auto item : py::reinterpret_borrow<py::iterable>(value)) {
-            auto converted = to_js(bridge, item, walk);
+            auto converted = copy_to_js(bridge, item, walk);
             set_property(bridge, array->value(), std::to_string(index++), converted->value());
         }
         return array;
@@ -135,7 +146,7 @@ inline std::unique_ptr<Bridge::Handle> to_js(Bridge &bridge, py::handle value,
                              bridge.makeNull());
         for (auto item : py::reinterpret_borrow<py::dict>(value)) {
             if (!py::isinstance<py::str>(item.first)) throw py::type_error("Dictionary keys must be strings");
-            auto converted = to_js(bridge, item.second, walk);
+            auto converted = copy_to_js(bridge, item.second, walk);
             set_property(bridge, object->value(), item.first.cast<std::string>(), converted->value());
         }
         return object;

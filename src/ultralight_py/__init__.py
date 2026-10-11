@@ -14,3 +14,6 @@ from .input import (KeyCode, KeyEvent, KeyEventType, Modifiers, MouseButton, Mou
                     MouseEventType, ScrollEvent, ScrollEventType)
 __all__ += ["KeyCode", "KeyEvent", "KeyEventType", "Modifiers", "MouseButton", "MouseEvent",
             "MouseEventType", "ScrollEvent", "ScrollEventType"]
+
+from .objects import PythonBinding
+__all__ += ["PythonBinding"]
