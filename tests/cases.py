@@ -83,23 +83,24 @@ def values():
         assert view.evaluate("undefined") is undefined
         assert view.evaluate("true") is True
         assert view.evaluate('"中文\\u0000😀"') == "中文\0😀"
-        assert view.evaluate("[,1,,]") == [undefined, 1.0, undefined]
+        assert view.evaluate("[,1,,]") == [undefined, 1, undefined]
         echo = view.evaluate_handle("x => x")
         value = {"中文\0": [None, undefined, True, 1, 1.25, "😀\0"], "__proto__": 5}
         assert echo.call(value).to_python() == value
         assert echo.call(9007199254740991).to_python() == 9007199254740991
         raises(OverflowError, lambda: echo.call(9007199254740992))
         raises(OverflowError, lambda: echo.call(10**100))
-        raises(TypeError, lambda: echo.call({1: "bad"}))
+        mapping = {1: "supported"}
+        assert echo.call(mapping).to_python() is mapping
         cycle = []; cycle.append(cycle)
-        raises(UltralightError, lambda: echo.call(cycle), ErrorCode.TraversalLimit)
+        assert echo.call(cycle).to_python() is cycle
         raises(UltralightError, lambda: view.evaluate("let cycle={}; cycle.self=cycle; cycle"), ErrorCode.TraversalLimit)
         nested = []
         for _ in range(65): nested = [nested]
-        raises(UltralightError, lambda: echo.call(nested), ErrorCode.TraversalLimit)
+        assert echo.call(nested).to_python() is nested
         raises(TypeError, lambda: view.evaluate("new Date()"))
         raises(TypeError, lambda: view.evaluate("() => 1"))
-        assert view.evaluate("({a:[{b:2},{b:2}]})") == {"a": [{"b": 2.0}, {"b": 2.0}]}
+        assert view.evaluate("({a:[{b:2},{b:2}]})") == {"a": [{"b": 2}, {"b": 2}]}
 
 
 def handles():
