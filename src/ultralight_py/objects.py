@@ -1,4 +1,5 @@
 """Document-local ownership of exported Python bindings."""
+
 from __future__ import annotations
 
 from ultralight_py import _support

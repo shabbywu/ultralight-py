@@ -14,7 +14,7 @@ Ultralight 2.x 的 Python 绑定，支持 CPU 离屏渲染、页面事件、Pyth
 git submodule update --init --recursive
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[test]'
+python -m pip install -e '.[test,dev]'
 python -c "import ultralight_py"
 ```
 
@@ -41,7 +41,7 @@ with Runtime() as runtime:
         view.set_callbacks(
             dom_ready=lambda event: ready.append(event) if event.is_main_frame else None,
         )
-        view.load_html('<style>body{background:#ff0000}</style><body>Hello')
+        view.load_html("<style>body{background:#ff0000}</style><body>Hello")
         deadline = time.monotonic() + 5
         while not ready:
             if time.monotonic() >= deadline:
@@ -111,8 +111,9 @@ def window_ready(event):
     if event.is_main_frame:
         view.bind_function("python_add", lambda a, b: a + b)
 
+
 view.set_callbacks(window_ready=window_ready)
-view.load_html('<script>window.answer=python_add(20,22)</script>')
+view.load_html("<script>window.answer=python_add(20,22)</script>")
 # 驱动 update()，等待主框架 DOM 就绪后：
 assert view.evaluate("answer") == 42
 
@@ -161,6 +162,7 @@ class Counter:
         self.value += 1
         self.history.append(self.value)
         return self.value
+
 
 left, right = Counter(0), Counter(100)
 left_binding = view.bind_object("left", left)
@@ -323,7 +325,7 @@ env PYTHON_BUILD_HOMEBREW_TCLTK_FORMULA=tcl-tk@8 \
 pyenv local 3.13.16
 python -m tkinter
 python -m venv .venv
-.venv/bin/python -m pip install build ninja '.[test]'
+.venv/bin/python -m pip install build ninja '.[test,dev]'
 ```
 
 重建已有 `.venv` 前先将旧目录移入 `build/` 备份。
@@ -332,3 +334,16 @@ python -m venv .venv
 
 Promise／asyncio 双向桥接与可选定时驱动见 [API 文档](docs/api.md)
 和 [示例](examples/async_bridge.py)。
+
+## Python 代码格式化
+
+开发依赖包含固定版本的 Ruff。安装后使用以下命令格式化或检查整个项目：
+
+```bash
+python -m pip install -e '.[test,dev]'
+python -m ruff format .
+python -m ruff format --check .
+```
+
+配置位于 `pyproject.toml`，行宽为 100，使用双引号、空格缩进和 LF 换行。
+格式化包含源码、类型声明、测试及示例，排除 `externals`、`build` 和 `dist`。

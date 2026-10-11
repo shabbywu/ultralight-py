@@ -10,3 +10,6 @@ __pycache__/
 /_skbuild/
 *.whl
 .DS_Store
+
+# Ruff cache
+.ruff_cache/

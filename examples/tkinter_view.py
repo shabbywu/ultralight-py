@@ -1,4 +1,5 @@
 """Interactive CPU-rendered page in a Tk Canvas (no extra image dependencies)."""
+
 import argparse
 import time
 import tkinter as tk
@@ -24,12 +25,12 @@ def ppm(pixels):
     """Copy visible RGB rows; SDK rows may contain padding."""
     rgb = bytearray(pixels.width * pixels.height * 3)
     for y in range(pixels.height):
-        row = pixels.data[y * pixels.row_bytes:y * pixels.row_bytes + pixels.width * 4]
+        row = pixels.data[y * pixels.row_bytes : y * pixels.row_bytes + pixels.width * 4]
         offset = y * pixels.width * 3
         end = offset + pixels.width * 3
         rgb[offset:end:3] = row[2::4]
-        rgb[offset + 1:end:3] = row[1::4]
-        rgb[offset + 2:end:3] = row[0::4]
+        rgb[offset + 1 : end : 3] = row[1::4]
+        rgb[offset + 2 : end : 3] = row[0::4]
     return f"P6\n{pixels.width} {pixels.height}\n255\n".encode() + rgb
 
 
@@ -46,7 +47,9 @@ class Counter:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--smoke", action="store_true", help="Verify display and close automatically")
+    parser.add_argument(
+        "--smoke", action="store_true", help="Verify display and close automatically"
+    )
     args = parser.parse_args()
     root = tk.Tk()
     root.title("Ultralight Python / Tkinter")

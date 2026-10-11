@@ -1,4 +1,5 @@
 """Serve an in-memory page and JavaScript through Python's resource loader."""
+
 import time
 from ultralight_py import Resource, Runtime
 
@@ -10,8 +11,10 @@ resources = {
 with Runtime(resource_loader=resources.get) as runtime:
     with runtime.create_view(320, 180) as view:
         ready, failures = [], []
-        view.set_callbacks(dom_ready=lambda event: ready.append(event) if event.is_main_frame else None,
-                           fail_loading=failures.append)
+        view.set_callbacks(
+            dom_ready=lambda event: ready.append(event) if event.is_main_frame else None,
+            fail_loading=failures.append,
+        )
         view.load_url("file:///page.html")
         deadline = time.monotonic() + 5
         while not ready:
@@ -19,5 +22,6 @@ with Runtime(resource_loader=resources.get) as runtime:
                 raise RuntimeError(failures[0].description)
             if time.monotonic() >= deadline:
                 raise TimeoutError("Page did not become ready")
-            runtime.update(); time.sleep(0.005)
+            runtime.update()
+            time.sleep(0.005)
         print(view.evaluate("answer"))

@@ -1,4 +1,5 @@
 """Framework-independent input data and script conveniences."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -130,14 +131,26 @@ class InputView:
     def fire_scroll_event(self, event: ScrollEvent) -> None:
         if not isinstance(event, ScrollEvent):
             raise TypeError("event must be ScrollEvent")
-        self._input_call("fire_scroll_event", int(event.type), event.delta_x, event.delta_y, event.x, event.y)
+        self._input_call(
+            "fire_scroll_event", int(event.type), event.delta_x, event.delta_y, event.x, event.y
+        )
 
     def fire_key_event(self, event: KeyEvent) -> None:
         if not isinstance(event, KeyEvent):
             raise TypeError("event must be KeyEvent")
-        self._input_call("fire_key_event", int(event.type), int(event.modifiers), event.virtual_key_code,
-                         event.native_key_code, event.key_identifier, event.text, event.unmodified_text,
-                         event.is_keypad, event.is_auto_repeat, event.is_system_key)
+        self._input_call(
+            "fire_key_event",
+            int(event.type),
+            int(event.modifiers),
+            event.virtual_key_code,
+            event.native_key_code,
+            event.key_identifier,
+            event.text,
+            event.unmodified_text,
+            event.is_keypad,
+            event.is_auto_repeat,
+            event.is_system_key,
+        )
 
     def focus(self) -> None:
         self._input_call("focus")
@@ -169,19 +182,54 @@ class InputView:
         self.fire_mouse_event(down)
         self.mouse_up(x, y, button=button)
 
-    def scroll(self, delta_x: int = 0, delta_y: int = 0, *, type: ScrollEventType = ScrollEventType.PIXEL,
-               x: int = -1, y: int = -1) -> None:
+    def scroll(
+        self,
+        delta_x: int = 0,
+        delta_y: int = 0,
+        *,
+        type: ScrollEventType = ScrollEventType.PIXEL,
+        x: int = -1,
+        y: int = -1,
+    ) -> None:
         self.fire_scroll_event(ScrollEvent(delta_x, delta_y, type, x, y))
 
-    def key_down(self, virtual_key_code: int, *, modifiers: Modifiers = Modifiers.NONE,
-                 native_key_code: int = 0, is_keypad: bool = False, is_auto_repeat: bool = False) -> None:
-        self.fire_key_event(KeyEvent(KeyEventType.RAW_KEY_DOWN, virtual_key_code, native_key_code, modifiers,
-                                    is_keypad=is_keypad, is_auto_repeat=is_auto_repeat))
+    def key_down(
+        self,
+        virtual_key_code: int,
+        *,
+        modifiers: Modifiers = Modifiers.NONE,
+        native_key_code: int = 0,
+        is_keypad: bool = False,
+        is_auto_repeat: bool = False,
+    ) -> None:
+        self.fire_key_event(
+            KeyEvent(
+                KeyEventType.RAW_KEY_DOWN,
+                virtual_key_code,
+                native_key_code,
+                modifiers,
+                is_keypad=is_keypad,
+                is_auto_repeat=is_auto_repeat,
+            )
+        )
 
-    def key_up(self, virtual_key_code: int, *, modifiers: Modifiers = Modifiers.NONE,
-               native_key_code: int = 0, is_keypad: bool = False) -> None:
-        self.fire_key_event(KeyEvent(KeyEventType.KEY_UP, virtual_key_code, native_key_code, modifiers,
-                                    is_keypad=is_keypad))
+    def key_up(
+        self,
+        virtual_key_code: int,
+        *,
+        modifiers: Modifiers = Modifiers.NONE,
+        native_key_code: int = 0,
+        is_keypad: bool = False,
+    ) -> None:
+        self.fire_key_event(
+            KeyEvent(
+                KeyEventType.KEY_UP,
+                virtual_key_code,
+                native_key_code,
+                modifiers,
+                is_keypad=is_keypad,
+            )
+        )
 
     def input_text(self, text: str, *, modifiers: Modifiers = Modifiers.NONE) -> None:
         if not isinstance(text, str):
@@ -190,5 +238,11 @@ class InputView:
         # Even an empty string must honor thread/closed/resource-callback checks.
         self._input_call("_check_input")
         for character in text:
-            self.fire_key_event(KeyEvent(KeyEventType.CHAR, modifiers=modifiers,
-                                         text=character, unmodified_text=character))
+            self.fire_key_event(
+                KeyEvent(
+                    KeyEventType.CHAR,
+                    modifiers=modifiers,
+                    text=character,
+                    unmodified_text=character,
+                )
+            )

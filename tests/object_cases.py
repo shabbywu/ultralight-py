@@ -1,4 +1,5 @@
 """Object bridge cases use fresh processes because Runtime is process-scoped."""
+
 import gc
 import sys
 import threading
@@ -70,26 +71,39 @@ def instances():
         assert left.reads == 1
         assert view.evaluate("'value' in left && !('_secret' in left)")
         assert view.evaluate("left._secret") is undefined
-        for source in ["left.readonly=3", "left.increment=3", "left.unknown=3", "left.broken", "Python.getattr(left,'_secret')"]:
+        for source in [
+            "left.readonly=3",
+            "left.increment=3",
+            "left.unknown=3",
+            "left.broken",
+            "Python.getattr(left,'_secret')",
+        ]:
             raises(JavaScriptError, lambda source=source: view.evaluate(source))
         view.bind_object("limited", left, members=["value"])
         assert view.evaluate("limited.increment") is undefined
         raises(JavaScriptError, lambda: view.evaluate("Python.getattr(limited,'increment')"))
         assert view.evaluate("Object.keys(limited)") == ["value"]
+
         class Slotted:
             __slots__ = ("value",)
-            def __init__(self): self.value = 3
+
+            def __init__(self):
+                self.value = 3
+
         value = Slotted()
         view.bind_object("slotted", value)
         view.evaluate("slotted.value=8")
         assert value.value == 8
         raises(ValueError, lambda: view.bind_object("bad", left, members=["_secret"]))
         raises(TypeError, lambda: view.bind_object("class_object", Counter))
+
         class ShadowedDict:
             value = 3
+
             @property
             def __dict__(self):
                 raise AssertionError("Enumeration executed __dict__ getter")
+
         view.bind_object("shadowed", ShadowedDict())
         assert view.evaluate("Object.keys(shadowed)") == ["value"]
 
@@ -121,7 +135,9 @@ def containers():
         view.evaluate("mapping.update({enabled:true}); Python.setitem(mapping,'keys',42)")
         assert mapping["keys"] == 42 and mapping["enabled"] is True
         assert view.evaluate("[...Python.iter(mapping.keys())]") == ["keys", 1, "enabled"]
-        assert view.evaluate("Python.call(items.sort,[],{reverse:true}); Python.to_value(items)") == [8, 7, 4, 3]
+        assert view.evaluate(
+            "Python.call(items.sort,[],{reverse:true}); Python.to_value(items)"
+        ) == [8, 7, 4, 3]
         view.bind_object("immutable", (1, 2))
         assert view.evaluate("Python.getitem(immutable,-1)") == 2
         for source, message in [
@@ -132,8 +148,11 @@ def containers():
             ("Python.setitem(immutable,0,8)", "TypeError"),
             ("Python.to_value(mapping)", "TypeError"),
         ]:
-            assert message in str(raises(JavaScriptError, lambda source=source: view.evaluate(source)))
-        cycle = []; cycle.append(cycle)
+            assert message in str(
+                raises(JavaScriptError, lambda source=source: view.evaluate(source))
+            )
+        cycle = []
+        cycle.append(cycle)
         view.bind_object("cycle", cycle)
         assert view.evaluate("Python.getitem(cycle,0)===cycle")
         raises(JavaScriptError, lambda: view.evaluate("Python.to_value(cycle)"))
@@ -172,9 +191,12 @@ def conversion():
         assert counter.values[-1] == 9
         view.bind_function("keyword", lambda *, value: value)
         assert view.evaluate("Python.call(keyword,[],{value:42})") == 42
+
         # bind_function preserves callable identity and native JSValue conversion.
         class CallableModel:
-            def __call__(self): return self
+            def __call__(self):
+                return self
+
         callable_model = CallableModel()
         view.bind_function("callable_model", callable_model)
         assert view.evaluate("callable_model") is callable_model
@@ -183,7 +205,10 @@ def conversion():
             binding = view.bind_function("get_script", lambda: script)
             assert view.evaluate("get_script().answer") == 42
             binding.close()
-        async def async_value(): return 1
+
+        async def async_value():
+            return 1
+
         view.bind_function("async_value", async_value)
         raises(JavaScriptError, lambda: view.evaluate("async_value()"))
 
@@ -197,17 +222,29 @@ def revocation():
         second = view.bind_object("second", value)
         weak = weakref.ref(value)
         assert view.evaluate("first!==second && first.values!==second.values")
-        view.evaluate("globalThis.saved=first; globalThis.method=first.increment; globalThis.child=first.values; globalThis.it=Python.iter(child); undefined")
-        first.close(); first.close()
+        view.evaluate(
+            "globalThis.saved=first; globalThis.method=first.increment; globalThis.child=first.values; globalThis.it=Python.iter(child); undefined"
+        )
+        first.close()
+        first.close()
         assert first.closed and not second.closed
         assert view.evaluate("typeof first") == "undefined"
-        for source in ["saved.value", "saved.value=8", "method()", "child.append(7)", "it.next()", "Object.keys(saved)", "'value' in saved"]:
+        for source in [
+            "saved.value",
+            "saved.value=8",
+            "method()",
+            "child.append(7)",
+            "it.next()",
+            "Object.keys(saved)",
+            "'value' in saved",
+        ]:
             raises(JavaScriptError, lambda source=source: view.evaluate(source))
         raises(UltralightError, lambda: view.evaluate("saved"), ErrorCode.PageGone)
         assert view.evaluate("second.increment(2)") == 2
         del value
         assert weak() is not None
-        view.unbind("second"); gc.collect()
+        view.unbind("second")
+        gc.collect()
         assert second.closed and weak() is None
         view.unbind("missing")
         old = view.bind_object("model", Counter(7))
@@ -253,6 +290,7 @@ def cleanup():
         handle = view.bind_object("model", value)
         del value
         observed, ready = [], threading.Event()
+
         def observe():
             ready.set()
             deadline = time.monotonic() + 2
@@ -261,9 +299,12 @@ def cleanup():
                     return
                 time.sleep(0.001)
             observed.append(True)
+
         worker = threading.Thread(target=observe)
-        worker.start(); assert ready.wait(2)
-        runtime.close(); gc.collect()
+        worker.start()
+        assert ready.wait(2)
+        runtime.close()
+        gc.collect()
         worker.join(2)
         assert observed == [True] and not worker.is_alive()
         assert handle.closed and weak() is None
@@ -276,48 +317,73 @@ def guards():
         load(runtime, view, "<body>")
         binding = view.bind_object("model", Counter())
         errors = []
+
         def worker():
-            for operation in [binding.close, lambda: view.bind_object("other", Counter()), lambda: view.unbind("model")]:
-                try: operation()
-                except UltralightError as error: errors.append(error.code)
-        thread = threading.Thread(target=worker); thread.start(); thread.join()
+            for operation in [
+                binding.close,
+                lambda: view.bind_object("other", Counter()),
+                lambda: view.unbind("model"),
+            ]:
+                try:
+                    operation()
+                except UltralightError as error:
+                    errors.append(error.code)
+
+        thread = threading.Thread(target=worker)
+        thread.start()
+        thread.join()
         assert errors == [ErrorCode.WrongThread] * 3
+
         def nested():
             raises(UltralightError, lambda: view.input_text("x"), ErrorCode.Busy)
             return view.evaluate("model.value")
+
         view.bind_function("nested", nested)
         assert view.evaluate("nested()") == 0
+
         def revoke():
             binding.close()
             return 42
+
         model = Counter()
         model.revoke = revoke
         binding = view.bind_object("model", model)
         view.evaluate("model.revoke()")
         assert binding.closed
         iterator_refs = []
+
         class Iterator:
-            def __iter__(self): return self
-            def __next__(self): raise StopIteration
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                raise StopIteration
+
         class IteratorMaker:
             def __iter__(self):
                 binding.close()
                 iterator = Iterator()
                 iterator_refs.append(weakref.ref(iterator))
                 return iterator
+
         binding = view.bind_object("maker", IteratorMaker())
         view.evaluate("Python.iter(maker); undefined")
         gc.collect()
         assert binding.closed and iterator_refs[0]() is None
+
         class Closer:
             def close(self):
                 view.close()
                 return 42
+
         view.bind_object("closer", Closer())
         raises(UltralightError, lambda: view.evaluate("closer.close()"), ErrorCode.PageGone)
         assert view.closed
 
 
-CASES = {name: globals()[name] for name in ["instances", "containers", "conversion", "revocation", "cleanup", "guards"]}
+CASES = {
+    name: globals()[name]
+    for name in ["instances", "containers", "conversion", "revocation", "cleanup", "guards"]
+}
 if __name__ == "__main__":
     CASES[sys.argv[1]]()

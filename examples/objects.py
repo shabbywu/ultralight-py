@@ -1,4 +1,5 @@
 """Two Python instances, live containers and independent binding revocation."""
+
 import time
 
 from ultralight_py import JavaScriptError, Runtime
@@ -25,8 +26,10 @@ with Runtime() as runtime:
             if event.is_main_frame:
                 bindings[:] = [view.bind_object("left", left), view.bind_object("right", right)]
 
-        view.set_callbacks(window_ready=window_ready,
-                           dom_ready=lambda event: ready.append(event) if event.is_main_frame else None)
+        view.set_callbacks(
+            window_ready=window_ready,
+            dom_ready=lambda event: ready.append(event) if event.is_main_frame else None,
+        )
         view.load_html("""<script>
             left.increment(2);
             Python.call(right.increment, [], {amount: 3});
@@ -38,7 +41,9 @@ with Runtime() as runtime:
         while not ready:
             if time.monotonic() > deadline:
                 raise TimeoutError("Page did not become ready")
-            runtime.update(); runtime.refresh_display(); runtime.render()
+            runtime.update()
+            runtime.refresh_display()
+            runtime.render()
             time.sleep(0.005)
         assert (left.value, right.value) == (2, 103)
         assert view.evaluate("left.history") is left.history

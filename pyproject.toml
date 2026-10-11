@@ -11,8 +11,21 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
+dev = ["ruff==0.17.0"]
 
 [tool.scikit-build]
 wheel.packages = ["src/ultralight_py"]
 sdist.include = ["externals/pybind11/**", "externals/ulbind17/**"]
 sdist.exclude = ["issue.md"]
+
+[tool.ruff]
+required-version = "==0.17.0"
+target-version = "py310"
+line-length = 100
+extend-exclude = ["externals", "build", "dist"]
+force-exclude = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

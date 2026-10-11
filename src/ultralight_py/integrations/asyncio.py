@@ -1,4 +1,5 @@
 """Optional asyncio timer for a Python-hosted Ultralight runtime."""
+
 from __future__ import annotations
 
 import asyncio
@@ -35,7 +36,10 @@ class Driver:
         self.closed = True
         self._timer.cancel()
         self.runtime._async_driver = None
-        _asyncio.stop(self.runtime, error or _native._make_error(_native.ErrorCode.Closed, 'asyncio driver closed'))
+        _asyncio.stop(
+            self.runtime,
+            error or _native._make_error(_native.ErrorCode.Closed, "asyncio driver closed"),
+        )
 
     def __enter__(self):
         return self
@@ -46,12 +50,16 @@ class Driver:
 
 def install(runtime, update_interval=1 / 60):
     _support.ensure_in_main_thread()
-    if isinstance(update_interval, bool) or not math.isfinite(update_interval) or update_interval <= 0:
-        raise ValueError('update_interval must be finite and positive')
+    if (
+        isinstance(update_interval, bool)
+        or not math.isfinite(update_interval)
+        or update_interval <= 0
+    ):
+        raise ValueError("update_interval must be finite and positive")
     if runtime.closed:
-        raise _native._make_error(_native.ErrorCode.Closed, 'Runtime is closed')
-    if getattr(runtime, '_async_driver', None) is not None:
-        raise RuntimeError('Runtime already has an asyncio driver')
+        raise _native._make_error(_native.ErrorCode.Closed, "Runtime is closed")
+    if getattr(runtime, "_async_driver", None) is not None:
+        raise RuntimeError("Runtime already has an asyncio driver")
     driver = Driver(runtime, update_interval)
     runtime._async_driver = driver
     return driver
@@ -62,7 +70,9 @@ def run(main, *, runtime, update_interval=1 / 60):
         driver = install(runtime, update_interval)
         task = asyncio.create_task(main)
         try:
-            done, _ = await asyncio.wait((task, driver.failure), return_when=asyncio.FIRST_COMPLETED)
+            done, _ = await asyncio.wait(
+                (task, driver.failure), return_when=asyncio.FIRST_COMPLETED
+            )
             if driver.failure in done:
                 raise driver.failure.result()
             return await task
@@ -71,4 +81,5 @@ def run(main, *, runtime, update_interval=1 / 60):
             if not task.done():
                 task.cancel()
             await asyncio.gather(task, return_exceptions=True)
+
     return asyncio.run(entry())

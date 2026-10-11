@@ -1,13 +1,18 @@
 """Load HTML, evaluate JavaScript, and read a CPU frame without a window."""
+
 import time
 from ultralight_py import Runtime
 
 with Runtime() as runtime:
     with runtime.create_view(320, 180) as view:
         ready, failures = [], []
-        view.set_callbacks(dom_ready=lambda event: ready.append(event) if event.is_main_frame else None,
-                           fail_loading=failures.append)
-        view.load_html('<style>html,body{margin:0;background:#e04020}</style><body>Hello Ultralight')
+        view.set_callbacks(
+            dom_ready=lambda event: ready.append(event) if event.is_main_frame else None,
+            fail_loading=failures.append,
+        )
+        view.load_html(
+            "<style>html,body{margin:0;background:#e04020}</style><body>Hello Ultralight"
+        )
         deadline = time.monotonic() + 5
         while not ready:
             if failures:

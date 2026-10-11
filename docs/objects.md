@@ -14,6 +14,7 @@ class Counter:
         self.history.append(self.value)
         return self.value
 
+
 left, right = Counter(0), Counter(100)
 left_binding = view.bind_object("left", left)
 right_binding = view.bind_object("right", right)

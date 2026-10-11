@@ -1,4 +1,5 @@
 """Internal asyncio loop ownership, Promise waits and delayed deliveries."""
+
 from __future__ import annotations
 
 import asyncio
@@ -16,24 +17,24 @@ def get_runtime():
 def associate(runtime):
     _support.ensure_in_main_thread()
     loop = asyncio.get_running_loop()
-    previous = getattr(runtime, '_async_loop', None)
+    previous = getattr(runtime, "_async_loop", None)
     if previous is not None and previous is not loop and not previous.is_closed():
-        raise RuntimeError('Runtime is already associated with another asyncio loop')
+        raise RuntimeError("Runtime is already associated with another asyncio loop")
     runtime._async_loop = loop
-    if not hasattr(runtime, '_async_work'):
+    if not hasattr(runtime, "_async_work"):
         runtime._async_work = set()
         runtime._async_deliveries = []
     return loop
 
 
 def stop(runtime, error):
-    for work in tuple(getattr(runtime, '_async_work', ())):
+    for work in tuple(getattr(runtime, "_async_work", ())):
         work(error)
-    getattr(runtime, '_async_deliveries', []).clear()
+    getattr(runtime, "_async_deliveries", []).clear()
 
 
 def flush(runtime):
-    pending = getattr(runtime, '_async_deliveries', [])
+    pending = getattr(runtime, "_async_deliveries", [])
     runtime._async_deliveries = []
     for deliver in pending:
         deliver()
@@ -100,6 +101,7 @@ def start(awaitable, delivery):
                 delivery.settle(result, False)
             finally:
                 delivery.close()
+
         runtime._async_deliveries.append(deliver)
 
     delivery.on_cancel(stop)

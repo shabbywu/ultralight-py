@@ -1,4 +1,5 @@
 """Python ownership and convenience layer over the native host adapter."""
+
 from __future__ import annotations
 
 import atexit
@@ -60,7 +61,9 @@ class Runtime:
         current = cls._instance
         if current is not None:
             if current.closed:
-                raise _native._make_error(ErrorCode.Closed, "Runtime was closed; Renderer recreation is unsupported")
+                raise _native._make_error(
+                    ErrorCode.Closed, "Runtime was closed; Renderer recreation is unsupported"
+                )
             if assets_root is not None and Path(assets_root).resolve() != current._assets_root:
                 raise ValueError("Runtime assets_root is already configured")
             if resource_loader is not None and resource_loader is not current._resource_loader:
@@ -69,7 +72,9 @@ class Runtime:
         self = super().__new__(cls)
         self._assets_root = Path.cwd() if assets_root is None else Path(assets_root).resolve()
         self._resource_loader = resource_loader
-        self._native = _support.call(_native._Runtime.create, str(self._assets_root), resource_loader)
+        self._native = _support.call(
+            _native._Runtime.create, str(self._assets_root), resource_loader
+        )
         self._native.set_error_handler(_report)
         cls._instance = self
         return self
@@ -79,7 +84,11 @@ class Runtime:
         return self._native.closed
 
     def create_view(self, width: int, height: int, *, transparent: bool = False) -> View:
-        return View(_support.call(self._native.create_view, _dimension(width), _dimension(height), transparent))
+        return View(
+            _support.call(
+                self._native.create_view, _dimension(width), _dimension(height), transparent
+            )
+        )
 
     def update(self) -> None:
         _support.ensure_in_main_thread()
@@ -136,11 +145,24 @@ class View(InputView):
     def resize(self, width: int, height: int) -> None:
         _support.call(self._native.resize, _dimension(width), _dimension(height))
 
-    def set_callbacks(self, *, begin_loading=None, window_ready=None, dom_ready=None,
-                      finish_loading=None, fail_loading=None, console=None) -> None:
-        callbacks = dict(begin_loading=begin_loading, window_ready=window_ready,
-                         dom_ready=dom_ready, finish_loading=finish_loading,
-                         fail_loading=fail_loading, console=console)
+    def set_callbacks(
+        self,
+        *,
+        begin_loading=None,
+        window_ready=None,
+        dom_ready=None,
+        finish_loading=None,
+        fail_loading=None,
+        console=None,
+    ) -> None:
+        callbacks = dict(
+            begin_loading=begin_loading,
+            window_ready=window_ready,
+            dom_ready=dom_ready,
+            finish_loading=finish_loading,
+            fail_loading=fail_loading,
+            console=console,
+        )
         for name, callback in callbacks.items():
             _callable(callback, name)
         _support.call(self._native.set_callbacks, callbacks)
@@ -159,8 +181,9 @@ class View(InputView):
                     return result.to_python()
             return value.to_python()
 
-    def bind_object(self, name: str, instance: object, *,
-                    members: Sequence[str] | None = None) -> PythonBinding:
+    def bind_object(
+        self, name: str, instance: object, *, members: Sequence[str] | None = None
+    ) -> PythonBinding:
         if not isinstance(name, str):
             raise TypeError("Binding name must be str")
         if members is not None:
