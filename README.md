@@ -4,6 +4,9 @@ Ultralight 2.x 的 Python 绑定，支持 CPU 离屏渲染、页面事件、Pyth
 双向函数调用、Python 实例与容器实时代理、文档级 JS 句柄、Python 虚拟资源加载，
 以及鼠标、滚动和键盘输入。
 
+文档：[公开 API](docs/api.md) · [对象桥接与迁移](docs/objects.md) ·
+[架构与维护约定](docs/architecture.md) · [0.2.0 发布说明](CHANGELOG.md)。
+
 依赖通过 `externals/pybind11` 和 `externals/ulbind17` 子模块管理。
 需要 Python 3.10+、CMake 3.22+ 和支持 C++20 的编译器。
 
@@ -21,7 +24,8 @@ python -c "import ultralight_py"
 python -m pip install -e . -Ccmake.define.ULTRALIGHT_SDK_ROOT=/absolute/path/to/sdk
 ```
 
-当前实际验收环境为 macOS ARM64、Python 3.13。包要求 Python 3.10+；
+当前实际验收环境为 macOS ARM64、普通 GIL Python 3.13.16。包要求 Python 3.10+，
+其他 Python 版本尚未逐版本完成当前 0.2.0 验收；
 Linux x64、Windows x64 保留依赖的构建支持，尚未完成 Python 绑定实测验收。
 pybind11 固定 v3.0.4，ulbind17 固定 `670910c`，默认 SDK 固定 2.0.0-beta.2。
 
@@ -296,6 +300,8 @@ python -m pytest tests -q
 ```
 
 wheel 包含原生扩展和 UltralightCore、WebCore、Ultralight 动态库，以及内嵌资源。
+本地 wheel 的平台标签取决于构建环境；ARM64 wheel 不适用于其他架构，
+本地 macOS 26 构建也不代表已经验证旧版 macOS 兼容性。
 sdist 包含固定子模块的源码，不要求消费者另行拉取子模块。离线构建应显式提供 SDK；
 默认下载复用 ulbind17 的版本固定、校验和缓存逻辑。测试以子进程隔离每个 Runtime 场景，
 覆盖离屏渲染、导航、回调释放、线程、异常、HTTP、本地/虚拟资源、输入重入、对象隔离、实时容器、绑定撤销及退出清理。

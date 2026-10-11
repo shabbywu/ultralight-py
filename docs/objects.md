@@ -121,6 +121,7 @@ assert binding.closed
 ```
 
 View 持有绑定，丢弃 PythonBinding 句柄不会自动解除绑定。
+`bind_function()` 使用相同的绑定机制，保留原 callable 身份；回传 Python 时恢复原 callable。
 每个绑定强持有已经导出的对象、容器和方法，直到显式解除绑定或文档失效；
 不承诺 JS GC 会及时释放它们。
 
@@ -131,6 +132,7 @@ View 持有绑定，丢弃 PythonBinding 句柄不会自动解除绑定。
 
 线程、输入和 Renderer 重入约束沿用 Runtime 的现有规则。Python 引用使用延迟队列释放，
 不会在 JSC 的 GC/finalizer 线程中获取 GIL。代理不持有 View 的强引用。
+`PythonBinding.closed` 可在其他线程查询；操作与显式关闭仍必须在 Python 主线程进行。
 
 ## 从 0.1.0 迁移
 
