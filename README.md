@@ -1,7 +1,7 @@
 # ultralight-py
 
 Ultralight 2.x 的 Python 绑定，支持 CPU 离屏渲染、页面事件、Python/JavaScript
-双向函数调用、文档级 JS 句柄，以及 Python 虚拟资源加载。
+双向函数调用、文档级 JS 句柄、Python 虚拟资源加载，以及鼠标、滚动和键盘输入。
 
 依赖通过 `externals/pybind11` 和 `externals/ulbind17` 子模块管理。
 需要 Python 3.10+、CMake 3.22+ 和支持 C++20 的编译器。
@@ -177,6 +177,79 @@ SDK 可从主线程和后台加载线程重复调用 loader。结果不缓存，
 读取不会清除脏区域，成功消费后调用 `clear_dirty_bounds()`。
 RGBA/非预乘转换、图像编码、GPU View 和零复制映射不包含在首版中。
 
+## 输入事件
+
+页面就绪后，在主线程向 View 发送输入：
+
+```python
+from ultralight_py import KeyCode, Modifiers, MouseButton
+
+view.focus()
+view.click(40, 80, button=MouseButton.LEFT)
+view.input_text("Hello，世界 😀")
+view.key_down(KeyCode.GK_BACK)
+view.key_up(KeyCode.GK_BACK)
+view.scroll(delta_y=-120, x=200, y=200)
+```
+
+`mouse_move()`、`mouse_down()`、`mouse_up()` 支持拖动；`click()` 依次发送移动、
+按下和释放，不隐式设置焦点。`focus()`、`unfocus()` 控制焦点，
+`has_focus` 和 `has_input_focus` 分别查询 View 焦点和可编辑元素焦点。
+坐标使用 View 的逻辑像素。滚动默认使用像素，正值向左/上、负值向右/下；
+传入 `type=ScrollEventType.PAGE` 可按页滚动，默认坐标 `(-1, -1)` 使用当前指针位置。
+
+需要完整事件字段时，使用不可变的 `MouseEvent`、`ScrollEvent`、`KeyEvent`，分别交给
+`fire_mouse_event()`、`fire_scroll_event()`、`fire_key_event()`。
+枚举值必须使用对应枚举类型；整数参数按有符号 32 位校验，不接受 bool 或浮点数。
+`KeyCode` 保留 SDK 的 `GK_*` 命名，`Modifiers` 支持 ALT、CTRL、META、SHIFT 组合。
+鼠标事件的修饰键状态来自最近的键盘事件，宿主需要转发修饰键的按下和释放。
+
+`key_down()` 发送 RAW_KEY_DOWN，不自动输入文本；`key_up()` 发送 KEY_UP。
+`input_text()` 按 Unicode 码点发送 CHAR，适合已经提交的文本；它不模拟物理按键，
+也不提供输入法预编辑或候选框定位。完整 KeyEvent 可指定原生键码、文本、未修饰文本、
+自动重复、小键盘和系统键标志。
+
+输入同样受主线程、对象关闭和运行时占用检查保护。在 Renderer、资源 loader、
+JavaScript 桥接或输入回调中再次发送输入会报错；需要追加输入时，将操作排队到宿主下一轮。
+输入回调可以关闭 View 或 Runtime。发送事件后仍需持续执行
+`update()`、`refresh_display()`、`render()`，尤其是滚动动画。
+
+## Tkinter 适配器与交互示例
+
+Tkinter 适配完全位于可选的 Python 模块中，原生绑定只提供通用输入事件。
+普通 `import ultralight_py` 不加载 tkinter，也不要求安装 Pillow。
+
+```python
+from ultralight_py.integrations.tkinter import TkInputAdapter
+
+adapter = TkInputAdapter(canvas, view)
+# 宿主用 root.after() 驱动 Runtime，并将 copy_pixels() 转成 Tk 图像。
+# 关闭窗口时先解除输入绑定，再释放 View 和 Runtime：
+adapter.close()
+view.close()
+runtime.close()
+```
+
+适配器自动转发指针、按钮、滚轮、焦点及键盘事件，使用独立 bindtag 保留宿主已有绑定。
+窗口失焦时释放按键和按钮，控件销毁时自动解除绑定；`close()` 可重复调用，
+只释放自身回调、定时任务和 View 引用，不关闭 View、Runtime 或控件。
+如果页面显示区域有缩放或偏移，可传入 `coordinate_transform=lambda x, y: (x, y)`
+将控件坐标转换为 View 坐标。
+
+`wheel_pixels=40` 设置每个标准滚轮单位的像素距离；适配器归一化 Aqua、Win32 和 X11
+的滚轮差异，Shift+滚轮转为水平滚动，并处理 X11 自动重复的释放事件。
+可打印字符与物理按键分开发送，快捷键不会重复插入文本。
+macOS Aqua 已完成实际窗口验收；Win32/X11 的映射通过模拟事件测试，尚未完成对应平台实测。
+
+```sh
+python examples/tkinter_view.py
+python examples/tkinter_view.py --smoke
+```
+
+示例包含按钮、文本框、滚动区域和事件记录，使用标准库将不透明 BGRA 帧转换为 PPM，
+通过 Tk Canvas 显示。渲染、窗口尺寸更新和关闭顺序由示例宿主管理。
+`--smoke` 创建真实窗口并检查帧尺寸、颜色及 Canvas 图像后自动退出，需要可用的图形环境。
+
 ## 构建与测试发行包
 
 ```sh
@@ -189,9 +262,10 @@ python -m pytest tests -q
 wheel 包含原生扩展和 UltralightCore、WebCore、Ultralight 动态库，以及内嵌资源。
 sdist 包含固定子模块的源码，不要求消费者另行拉取子模块。离线构建应显式提供 SDK；
 默认下载复用 ulbind17 的版本固定、校验和缓存逻辑。测试以子进程隔离每个 Runtime 场景，
-覆盖离屏渲染、导航、回调释放、线程、异常、HTTP、本地/虚拟资源和退出清理。
+覆盖离屏渲染、导航、回调释放、线程、异常、HTTP、本地/虚拟资源、输入重入及退出清理。
+Tk 测试同时覆盖模拟平台事件和真实窗口；缺少 Tk 或显示服务时跳过真实窗口用例。
 
-后续范围：Python 对象代理、输入事件、Promise/asyncio 和其他平台实测。
+后续范围：Python 对象代理、Promise/asyncio 和其他平台实测。
 
 
 ## macOS Tk 开发环境
