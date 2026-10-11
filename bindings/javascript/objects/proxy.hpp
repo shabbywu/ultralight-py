@@ -1,5 +1,5 @@
 #pragma once
-#include "state.hpp"
+#include "async.hpp"
 namespace binding::objects {
 inline py::object policy(const std::shared_ptr<Document> &doc) { return doc->policy->object(); }
 inline JSValueRef node_call(const std::weak_ptr<Node> &weak, std::span<const JSValueRef> args) {
@@ -40,6 +40,8 @@ inline JSValueRef node_call(const std::weak_ptr<Node> &weak, std::span<const JSV
             } else throw py::value_error("Unknown Python proxy operation");
         }
         if (scope->closed || !bridge->active()) return nullptr;
+        if (py::module_::import("inspect").attr("isawaitable")(result).cast<bool>())
+            return async_result(scope, *bridge, result)->value();
         return scope->convert(*bridge, result)->value();
     } catch (py::error_already_set &error) { throw Error(Code::HostException, error.what()); }
     catch (const py::type_error &error) { throw Error(Code::HostException, std::string("TypeError: ") + error.what()); }

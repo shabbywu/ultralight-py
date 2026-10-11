@@ -2,6 +2,10 @@
 #include "objects/document.hpp"
 namespace binding {
 inline void register_javascript(py::module_ &module) {
+  py::class_<objects::Delivery, std::shared_ptr<objects::Delivery>>(module, "_AsyncDelivery")
+      .def("close", &objects::Delivery::close)
+      .def("settle", &objects::Delivery::settle)
+      .def("on_cancel", [](objects::Delivery &d, py::object cb) { d.cancel = reference(cb); });
   py::class_<objects::Session, std::shared_ptr<objects::Session>>(module, "_PythonBinding")
       .def("close", &objects::Session::close).def("check", &objects::Session::check)
       .def_property_readonly("closed", [](const objects::Session &scope) { return scope.closed.load(); });

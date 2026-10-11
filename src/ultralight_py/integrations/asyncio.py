@@ -133,3 +133,42 @@ def run(main, *, runtime, update_interval=1 / 60):
             await asyncio.gather(task, return_exceptions=True)
     return asyncio.run(entry())
 
+
+def _start(awaitable, delivery):
+    runtime = _runtime()
+    try:
+        loop = _associate(runtime)
+        owned = not isinstance(awaitable, asyncio.Future)
+        task = asyncio.ensure_future(awaitable, loop=loop)
+    except BaseException:
+        if inspect.iscoroutine(awaitable):
+            awaitable.close()
+        raise
+
+    def stop(error=None):
+        delivery.close()
+        task.remove_done_callback(done)
+        runtime._async_work.discard(stop)
+        if owned:
+            task.cancel()
+            # Retrieve exceptions from tasks which suppress cancellation.
+            task.add_done_callback(lambda t: None if t.cancelled() else t.exception())
+
+    def done(task):
+        def deliver():
+            if stop not in runtime._async_work:
+                return
+            runtime._async_work.discard(stop)
+            try:
+                result = task.result()
+            except BaseException as error:
+                delivery.settle(str(error) or type(error).__name__, True)
+            else:
+                delivery.settle(result, False)
+            finally:
+                delivery.close()
+        runtime._async_deliveries.append(deliver)
+
+    delivery.on_cancel(stop)
+    runtime._async_work.add(stop)
+    task.add_done_callback(done)
