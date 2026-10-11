@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.22)
+project(ultralight_py VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(BUILD_TESTING OFF CACHE BOOL "Build dependency tests")
+set(ULTRALIGHT_SDK_VERSION "2.0.0-beta.2" CACHE STRING "Ultralight SDK version")
+
+set(PYBIND11_FINDPYTHON ON)
+find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+add_subdirectory(externals/pybind11)
+add_subdirectory(externals/ulbind17 EXCLUDE_FROM_ALL)
+
+pybind11_add_module(_native MODULE bindings/module.cpp)
+target_link_libraries(_native PRIVATE ulbind17::header)
+ulbind17_copy_runtime_files(_native INCLUDE_APPCORE OFF)
+install(TARGETS _native LIBRARY DESTINATION ultralight_py RUNTIME DESTINATION ultralight_py)
+foreach(library IN ITEMS UltralightCore WebCore Ultralight)
+  install(FILES "$<TARGET_FILE:Ultralight::${library}>" DESTINATION ultralight_py)
+endforeach()

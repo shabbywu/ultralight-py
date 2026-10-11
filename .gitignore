@@ -1,0 +1,12 @@
+# Python and local environments
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Build artifacts
+/build/
+/dist/
+/_skbuild/
+*.whl
+.DS_Store
