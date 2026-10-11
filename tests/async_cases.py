@@ -115,6 +115,99 @@ async def main():
         raise AssertionError("navigation left waiter alive")
 
 
+async def keyword_calls():
+    view.bind_function("sync", lambda *, value: value + 1)
+    assert await view.evaluate_async("Python.call(sync, [], {value:41})") == 42
+
+    async def immediate(*, value):
+        return value + 1
+
+    async def delayed(value, *, scale):
+        await asyncio.sleep(0.002)
+        return value * scale
+
+    async def fail(*, message):
+        raise ValueError(message)
+
+    view.bind_function("immediate", immediate)
+    view.bind_function("delayed", delayed)
+    view.bind_function("fail", fail)
+    assert await view.evaluate_async("Python.call(immediate, [], {value:41})") == 42
+    assert await view.evaluate_async("Python.call(delayed, [21], {scale:2})") == 42
+    try:
+        await view.evaluate_async('Python.call(fail, [], {message:"keyword failure"})')
+    except JavaScriptError as error:
+        assert "keyword failure" in str(error)
+    else:
+        raise AssertionError("Python.call lost async rejection")
+
+    class Counter:
+        def __init__(self, value):
+            self.value = value
+
+        async def add(self, *, amount):
+            await asyncio.sleep(0.002)
+            return self.value + amount
+
+    view.bind_object("left", Counter(1))
+    view.bind_object("right", Counter(10))
+    assert await view.evaluate_async(
+        "Promise.all([Python.call(left.add, [], {amount:2}), "
+        "Python.call(right.add, [], {amount:3})])"
+    ) == [3, 13]
+
+
+async def keyword_lifecycle():
+    started = {name: asyncio.Event() for name in ("left", "right", "nav", "close")}
+    cancelled = {name: asyncio.Event() for name in started}
+
+    async def endless(*, name):
+        started[name].set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled[name].set()
+
+    left = view.bind_function("left", endless)
+    view.bind_function("right", endless)
+    view.evaluate_handle('Python.call(left, [], {name:"left"})').close()
+    view.evaluate_handle('Python.call(right, [], {name:"right"})').close()
+    await started["left"].wait()
+    await started["right"].wait()
+    left.close()
+    await asyncio.wait_for(cancelled["left"].wait(), 1)
+    assert not cancelled["right"].is_set()
+    view.unbind("right")
+    await asyncio.wait_for(cancelled["right"].wait(), 1)
+
+    shared = asyncio.get_running_loop().create_future()
+    binding = view.bind_function("shared", lambda: shared)
+    view.evaluate_handle("Python.call(shared, [])").close()
+    binding.close()
+    assert not shared.cancelled()
+    shared.set_result(9)
+
+    view.bind_function("endless", endless)
+    view.evaluate_handle('Python.call(endless, [], {name:"nav"})').close()
+    await started["nav"].wait()
+    ready = asyncio.Event()
+    view.set_callbacks(dom_ready=lambda e: ready.set() if e.is_main_frame else None)
+    view.load_html("<body>new document")
+    await asyncio.wait_for(cancelled["nav"].wait(), 1)
+    await asyncio.wait_for(ready.wait(), 1)
+    view.bind_function("endless", endless)
+    waiting = asyncio.create_task(view.evaluate_async('Python.call(endless, [], {name:"close"})'))
+    await started["close"].wait()
+    view.close()
+    await asyncio.wait_for(cancelled["close"].wait(), 1)
+    try:
+        await waiting
+    except UltralightError as error:
+        assert error.code == ErrorCode.PageGone
+    else:
+        raise AssertionError("closing View left Python.call waiter alive")
+
+
 async def manual():
     future = asyncio.create_task(view.evaluate_async("new Promise(r=>globalThis.finish=r)"))
     await asyncio.sleep(0)
@@ -205,8 +298,8 @@ try:
             assert str(error) == "run driver failure"
         else:
             raise AssertionError("run swallowed driver failure")
-    elif sys.argv[1] == "main":
-        run(main(), runtime=runtime, update_interval=0.001)
+    elif sys.argv[1] in {"main", "keyword_calls", "keyword_lifecycle"}:
+        run(globals()[sys.argv[1]](), runtime=runtime, update_interval=0.001)
     else:
         asyncio.run(globals()[sys.argv[1]]())
 finally:

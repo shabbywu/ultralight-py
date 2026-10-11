@@ -94,7 +94,7 @@ list/dict 的 `append`、`insert`、`pop`、`update` 等方法直接调用 Pytho
 | `Python.contains(obj, value)` | Python 成员判断；dict 检查键 |
 | `Python.slice(stop)` / `slice(start, stop, step)` | 创建 Python slice；null 表示 None |
 | `Python.iter(obj)` | Python 迭代器的 JS 适配，支持 `for...of`；结束或提前退出后释放迭代器引用 |
-| `Python.call(fn, args, kwargs)` | 调用 Python callable，kwargs 可省略 |
+| `Python.call(fn, args, kwargs)` | 调用 Python callable，kwargs 可省略；返回 awaitable 时转换为 JS Promise |
 | `Python.to_value(obj)` | 显式复制基础容器为普通 JS Array/Object |
 
 例如传入关键字参数：

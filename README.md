@@ -24,7 +24,7 @@ python -c "import ultralight_py"
 python -m pip install -e . -Ccmake.define.ULTRALIGHT_SDK_ROOT=/absolute/path/to/sdk
 ```
 
-本轮验收限定 macOS ARM64、普通 GIL Python 3.13.16。包要求 Python 3.10+，
+当前已验证 macOS ARM64、普通 GIL Python 3.13.16。包要求 Python 3.10+，
 其他 Python 版本尚未逐版本完成验收；
 Linux x64、Windows x64 保留依赖的构建支持，尚未完成 Python 绑定实测验收。
 pybind11 固定 v3.0.4，ulbind17 固定 `670910c`，默认 SDK 固定 2.0.0-beta.2。

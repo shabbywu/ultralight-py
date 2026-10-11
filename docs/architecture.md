@@ -48,14 +48,12 @@ View/JSValue 的交叉操作位于 `view/javascript.hpp`。
 | `async.hpp` | Python awaitable 的 JS Promise、会话撤销与 SDK PostTask 投递 |
 
 `conversion.hpp` 保留基础按值转换，循环和深度限制复用 ulbind17 Traversal。
-实时代理转换不再携带无用的 Traversal 参数。删除了原生层中仅转调 bind_object 的 bind_function；
-公共 Python bind_function 继续提供 callable 校验与绑定入口。
+公共 Python bind_function 提供 callable 校验，原生层统一使用 bind_object 绑定。
 
 ## 所有权和清理
 
 Runtime 强持有尚未关闭的原生 View 包装，View 弱引用 Runtime。
 关闭 View 时从 Runtime 列表移除，局部强引用保护执行中的关闭操作；Runtime 关闭先移出列表再逐一关闭。
-旧实现等到 update 才扫描清理，现改为即时移除，更新入口不再重复扫描。
 Python View 回收仅入队，避免在任意线程直接销毁 SDK 对象。
 
 每个有效文档通过 Bridge 的生命周期守卫持有 Document。
@@ -70,15 +68,11 @@ JS payload 不持有 Python 强引用，文档失效清除守卫，先撤销会�
 没有被消费完或提前 return 的迭代器也保留到会话失效。
 Python 回调若捕获 View/Runtime，可形成跨语言引用环，应用应显式 close。
 
-## 本轮审查结论
-
-消除了等待 update 才释放已关闭 View 包装的延迟及过期文档注册记录的积累，
-移除了重复 callable 包装、重复解包及原生转调入口，
-提取共用调用工具，并按会话、代理、运算、迭代、初始化进一步拆分头文件。
 动态注册入口、JS 工厂回调以及解释器退出钩子即使没有静态调用边，也不能作为 dead code 删除。
 内嵌字体、SDK 资源覆盖层与固定版本下载继续复用 ulbind17，未另建通用运行时实现。
+
+## 异步桥接
 
 异步桥接通过 `_asyncio.py` 管理循环关联、任务监听和延迟投递，
 原生 `async.hpp` 使用文档及绑定会话限制投递范围，并通过 SDK PostTask 回写。
 取消、解绑、导航、关闭及驱动器失败会撤销相关工作；asyncio/Tk 状态留在 Python 宿主层。
-本轮验收限定 macOS ARM64；其他平台不属于本轮验收范围。

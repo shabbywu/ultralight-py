@@ -29,6 +29,8 @@ inline JSValueRef helper_call(const std::weak_ptr<Document> &weak, std::span<con
             return make_iterator(scope, *b, positional[0]);
         } else result = policy(doc).attr("operate")(operation, positional);
         if (scope->closed || !b->active()) return nullptr;
+        if (py::module_::import("inspect").attr("isawaitable")(result).cast<bool>())
+            return async_result(scope, *b, result)->value();
         return scope->convert(*b, result)->value();
     } catch (py::error_already_set &error) { throw Error(Code::HostException, error.what()); }
     catch (const py::type_error &error) { throw Error(Code::HostException, std::string("TypeError: ") + error.what()); }

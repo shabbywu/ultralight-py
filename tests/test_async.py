@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.parametrize("case", ["main", "manual", "failure", "run_failure"])
+@pytest.mark.parametrize(
+    "case", ["main", "manual", "failure", "run_failure", "keyword_calls", "keyword_lifecycle"]
+)
 def test_async_bridge(case, tmp_path):
     env = os.environ.copy()
     if env.get("PYTHONPATH"):
