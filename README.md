@@ -22,7 +22,7 @@ python -m pip install -e . -Ccmake.define.ULTRALIGHT_SDK_ROOT=/absolute/path/to/
 
 当前实际验收环境为 macOS ARM64、Python 3.13。包要求 Python 3.10+；
 Linux x64、Windows x64 保留依赖的构建支持，尚未完成 Python 绑定实测验收。
-pybind11 固定 v3.0.4，ulbind17 固定 `ebd1faf`，默认 SDK 固定 2.0.0-beta.2。
+pybind11 固定 v3.0.4，ulbind17 固定 `4774830`，默认 SDK 固定 2.0.0-beta.2。
 
 ## 最小离屏闭环
 
@@ -192,3 +192,24 @@ sdist 包含固定子模块的源码，不要求消费者另行拉取子模块�
 覆盖离屏渲染、导航、回调释放、线程、异常、HTTP、本地/虚拟资源和退出清理。
 
 后续范围：Python 对象代理、输入事件、Promise/asyncio 和其他平台实测。
+
+
+## macOS Tk 开发环境
+
+项目开发解释器固定为普通 GIL 版本的 Python 3.13.16，Tk 使用 Homebrew 的 Tcl/Tk 8.6。
+
+```sh
+brew install tcl-tk@8
+env PYTHON_BUILD_HOMEBREW_TCLTK_FORMULA=tcl-tk@8 \
+    PYTHON_BUILD_TCLTK_USE_PKGCONFIG=1 \
+    PKG_CONFIG_PATH="$(brew --prefix tcl-tk@8)/lib/pkgconfig" \
+    pyenv install 3.13.16
+pyenv local 3.13.16
+python -m tkinter
+python -m venv .venv
+.venv/bin/python -m pip install build ninja '.[test]'
+```
+
+重建已有 `.venv` 前先将旧目录移入 `build/` 备份。
+`python -m tkinter` 必须能创建窗口；仅安装 Python 的 tkinter 源码不代表 `_tkinter` 扩展可用。
+这套解释器用于开发和实际窗口验收，发行包仍声明 Python 3.10+。
