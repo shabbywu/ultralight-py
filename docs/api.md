@@ -1,4 +1,4 @@
-# 公开 API（0.3.0）
+# 公开 API
 
 稳定入口为 `ultralight_py`；`_native`、下划线成员和内部包装构造器不属于公开接口。
 通过 Runtime 创建 View，通过 View 或 JSValue 获取 JSValue，通过绑定方法获取 PythonBinding。
@@ -35,7 +35,7 @@
 | `clear_dirty_bounds()` | 宿主成功消费帧后清除脏区域 |
 | `close()`、`closed` | 幂等关闭；上下文退出也关闭 |
 
-对象成员、容器运算和迁移规则见 [对象桥接](objects.md)。
+对象成员、容器运算和转换规则见 [对象桥接](objects.md)。
 输入方法见 [README 输入事件](../README.md#输入事件)，继承的输入 API 同样属于公开 View 接口。
 `window_ready` 用于在页面脚本执行前安装绑定；`dom_ready` 用于等待 DOM 可用。
 FrameEvent 和 LoadFailure 是独立、只读的事件数据；console 参数为普通字典。
@@ -97,7 +97,7 @@ closed 是状态查询，不会启动引擎操作；PythonBinding.closed 可从�
 渲染、帧转换和定时驱动由宿主承担；普通包导入不依赖 tkinter 或 Pillow。
 事件回调为同步接口；Promise/asyncio 桥接见下节。
 
-## Promise 与 asyncio（0.3.0）
+## Promise 与 asyncio
 
 `await JSValue.await_result()` 等待 JS Promise，返回需要关闭的 `JSValue`。
 非 Promise 抛出 `TypeError`；rejection 抛出带错误信息的 `JavaScriptError`。
@@ -130,4 +130,4 @@ await 不隐式 update。自定义宿主可以自行调用 update，不必安装
 更新间隔是目标调度间隔；阻塞宿主线程或长时间执行 JS 会延迟更新。
 驱动器关闭或失败会终止关联的跨语言等待和投递；`run()` 传播驱动错误，
 退出时清理定时器、监听和任务。关闭驱动器后的 JS Promise 可能保持 pending。
-本版本不提供 Tk/asyncio 联合循环或 JS AbortSignal。
+当前不提供 Tk/asyncio 联合循环或 JS AbortSignal。

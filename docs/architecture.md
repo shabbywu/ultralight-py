@@ -1,7 +1,7 @@
 # 架构与维护约定
 
 项目采用三层实现：ulbind17 提供跨语言宿主能力，原生绑定管理 Python/JSC 边界，
-Python 层提供公开 API、Python 语义和可选宿主集成。现有分层适合当前 CPU 离屏与同步桥接范围。
+Python 层提供公开 API、Python 语义和可选宿主集成。当前范围包含 CPU 离屏渲染和同步、异步双向桥接。
 
 | 层 | 职责与边界 |
 | --- | --- |
@@ -23,7 +23,7 @@ Python 层提供公开 API、Python 语义和可选宿主集成。现有分层�
 导入统一放在模块顶部并使用绝对路径。相互引用的模块先导入模块对象，
 在函数运行时访问类型属性，避免初始化期间读取尚未定义的类型。
 三者共用 `_support.py` 的主线程入口与 finally 清理，不让输入或绑定关闭反向依赖 api。
-`objects._unwrap()` 为识别公共 JSValue 延迟导入其类型；这是运行时转换的依赖，不参与模块初始化。
+`_objects.unwrap()` 通过 `_api.JSValue` 识别公共句柄；模块初始化时不读取尚未定义的类型。
 
 `api.pyi`、`input.pyi`、`objects.pyi` 分别描述对应模块，根 stub 只重新导出同一类型，
 避免根入口与模块入口出现两个不同的静态类型。Tk 适配器拥有独立 stub。
@@ -45,6 +45,7 @@ View/JSValue 的交叉操作位于 `view/javascript.hpp`。
 | `iteration.hpp` | Python 迭代器适配及完成/提前退出后的引用释放 |
 | `operators.hpp` | JS Python 运算入口、绑定范围选择与异常转换 |
 | `document.hpp` | 文档初始化、生命周期守卫与通用转换入口接线 |
+| `async.hpp` | Python awaitable 的 JS Promise、会话撤销与 SDK PostTask 投递 |
 
 `conversion.hpp` 保留基础按值转换，循环和深度限制复用 ulbind17 Traversal。
 实时代理转换不再携带无用的 Traversal 参数。删除了原生层中仅转调 bind_object 的 bind_function；
@@ -77,5 +78,7 @@ Python 回调若捕获 View/Runtime，可形成跨语言引用环，应用应显
 动态注册入口、JS 工厂回调以及解释器退出钩子即使没有静态调用边，也不能作为 dead code 删除。
 内嵌字体、SDK 资源覆盖层与固定版本下载继续复用 ulbind17，未另建通用运行时实现。
 
-未来加入异步桥接时，需要单独定义任务取消、导航失效和事件循环驱动；
-不应将 asyncio/Tk 状态写入通用 Bridge。跨平台与更多 Python 版本仍需实际验收，见发布说明。
+异步桥接通过 `_asyncio.py` 管理循环关联、任务监听和延迟投递，
+原生 `async.hpp` 使用文档及绑定会话限制投递范围，并通过 SDK PostTask 回写。
+取消、解绑、导航、关闭及驱动器失败会撤销相关工作；asyncio/Tk 状态留在 Python 宿主层。
+本轮验收限定 macOS ARM64；其他平台不属于本轮验收范围。

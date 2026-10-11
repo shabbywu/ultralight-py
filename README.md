@@ -2,10 +2,10 @@
 
 Ultralight 2.x 的 Python 绑定，支持 CPU 离屏渲染、页面事件、Python/JavaScript
 双向函数调用、Python 实例与容器实时代理、文档级 JS 句柄、Python 虚拟资源加载，
-以及鼠标、滚动和键盘输入。
+以及鼠标、滚动和键盘输入、Promise/asyncio 双向桥接。
 
-文档：[公开 API](docs/api.md) · [对象桥接与迁移](docs/objects.md) ·
-[架构与维护约定](docs/architecture.md) · [0.3.0 发布说明](CHANGELOG.md)。
+文档：[公开 API](docs/api.md) · [对象桥接](docs/objects.md) ·
+[架构与维护约定](docs/architecture.md) · [更新日志](CHANGELOG.md)。
 
 依赖通过 `externals/pybind11` 和 `externals/ulbind17` 子模块管理。
 需要 Python 3.10+、CMake 3.22+ 和支持 C++20 的编译器。
@@ -24,8 +24,8 @@ python -c "import ultralight_py"
 python -m pip install -e . -Ccmake.define.ULTRALIGHT_SDK_ROOT=/absolute/path/to/sdk
 ```
 
-当前实际验收环境为 macOS ARM64、普通 GIL Python 3.13.16。包要求 Python 3.10+，
-其他 Python 版本尚未逐版本完成当前 0.3.0 验收；
+本轮验收限定 macOS ARM64、普通 GIL Python 3.13.16。包要求 Python 3.10+，
+其他 Python 版本尚未逐版本完成验收；
 Linux x64、Windows x64 保留依赖的构建支持，尚未完成 Python 绑定实测验收。
 pybind11 固定 v3.0.4，ulbind17 固定 `670910c`，默认 SDK 固定 2.0.0-beta.2。
 
@@ -177,11 +177,11 @@ left_binding.close()
 同类实例的方法与状态分别管理，每个绑定内部保持对象身份，解除绑定使已导出的嵌套代理和方法失效。
 主框架导航后重新绑定；View 持有 PythonBinding，丢弃句柄不会解除绑定。
 
-**0.2.0 有转换行为变更**：Python list/dict/tuple 统一使用实时代理，
+Python list/dict/tuple 统一使用实时代理，
 包括函数返回值和 JSValue 的参数。JS 使用 Python 的 `append`、`get` 等方法，
 严格索引使用 `Python.getitem/setitem/delitem`，不模拟 JS Array/Object。
 需要普通 JS 数据时使用 `Python.to_value()` 显式复制。
-完整 API、身份和释放规则见 [对象桥接与迁移说明](docs/objects.md)。
+完整 API、身份和释放规则见 [对象桥接](docs/objects.md)。
 
 ## 资源加载
 
@@ -294,16 +294,18 @@ python examples/tkinter_view.py --smoke
 
 ## 构建与测试发行包
 
+将安装命令中的路径替换为 `dist/` 中本次生成的 wheel 文件。
+
 ```sh
 python -m pip install build
-python -m build -Ccmake.define.ULTRALIGHT_SDK_ROOT=/absolute/path/to/sdk
-python -m pip install --force-reinstall --no-index --find-links=dist 'ultralight-py==0.3.0'
+python -m build
+python -m pip install --force-reinstall /path/to/built.whl
 python -m pytest tests -q
 ```
 
 wheel 包含原生扩展和 UltralightCore、WebCore、Ultralight 动态库，以及内嵌资源。
 本地 wheel 的平台标签取决于构建环境；ARM64 wheel 不适用于其他架构，
-本地 macOS 26 构建也不代表已经验证旧版 macOS 兼容性。
+当前系统上的构建不代表已验证旧版 macOS 兼容性。
 sdist 包含固定子模块的源码，不要求消费者另行拉取子模块。离线构建应显式提供 SDK；
 默认下载复用 ulbind17 的版本固定、校验和缓存逻辑。测试以子进程隔离每个 Runtime 场景，
 覆盖离屏渲染、导航、回调释放、线程、异常、HTTP、本地/虚拟资源、输入重入、对象隔离、实时容器、绑定撤销及退出清理。
@@ -325,10 +327,10 @@ env PYTHON_BUILD_HOMEBREW_TCLTK_FORMULA=tcl-tk@8 \
 pyenv local 3.13.16
 python -m tkinter
 python -m venv .venv
-.venv/bin/python -m pip install build ninja '.[test,dev]'
+source .venv/bin/activate
+python -m pip install build ninja '.[test,dev]'
 ```
 
-重建已有 `.venv` 前先将旧目录移入 `build/` 备份。
 `python -m tkinter` 必须能创建窗口；仅安装 Python 的 tkinter 源码不代表 `_tkinter` 扩展可用。
 这套解释器用于开发和实际窗口验收，发行包仍声明 Python 3.10+。
 

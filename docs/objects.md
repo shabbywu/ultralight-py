@@ -1,4 +1,4 @@
-# Python 对象桥接（0.2.0）
+# Python 对象桥接
 
 Python 创建普通实例后，JS 可以直接访问它的公开属性和方法。list、dict、tuple 也使用实时代理，
 不模拟 JS Array/Object。所有操作均在 Python 主线程进行。
@@ -106,8 +106,8 @@ Python.call(values.sort, [], {reverse: true});
 
 Python 迭代规则保持不变：例如遍历 dict 时改变其大小会抛 RuntimeError。
 Python 异常转成 JS Error，保留异常类型和消息；通过 `view.evaluate()` 调用时表现为
-`JavaScriptError`。本阶段没有 JS 类构造器或 Promise/asyncio 桥接，类对象、模块、
-二进制 buffer 和 awaitable 不自动代理。
+`JavaScriptError`。绑定函数和对象方法返回 awaitable 时转换为 JS Promise，
+使用方式见 [Promise 与 asyncio](api.md)。类对象、模块和二进制 buffer 不自动代理。
 
 ## 生命周期与撤销
 
@@ -135,21 +135,11 @@ View 持有绑定，丢弃 PythonBinding 句柄不会自动解除绑定。
 不会在 JSC 的 GC/finalizer 线程中获取 GIL。代理不持有 View 的强引用。
 `PythonBinding.closed` 可在其他线程查询；操作与显式关闭仍必须在 Python 主线程进行。
 
-## 从 0.1.0 迁移
+## 按值复制
 
-0.2.0 接受以下行为变更：
-
-- Python list/tuple/dict、普通实例和 callable 统一使用实时代理，包括 `bind_function`
-  返回值以及 `JSValue.set/call` 的参数。代理回传 Python 时恢复原对象，保留 `is` 身份。
-- Python 容器不再自动转换为普通 JS Array/Object。使用 `Python.to_value()` 显式复制，
-  再交给 JSON、JS 数组算法或需要普通数据对象的代码。
-- 普通 JS Array/Object 回传 Python 仍按值复制；JS 有限安全整数转换为 Python int，
-  其余数字为 float，保留负零。
-- `bind_function()` 现在也返回 PythonBinding，可显式撤销它导出的全部对象。
-  `JSValue.set/call` 隐式导出的对象由文档会话持有，直到导航或关闭。
-- Python 容器中的循环引用允许代理访问；`to_value()` 的复制仍拒绝循环或超过 64 层的数据。
-  复制 dict 仍要求字符串键，不复制普通 Python 类实例或 dict views。
-- Python 整数导出为 JS Number 时仍要求 ±(2⁵³−1)，不进行隐式字符串转换。
+Python 容器使用实时代理。需要普通 JS Array/Object 时，使用 `Python.to_value()`
+复制快照，例如交给 JSON 或 JS 数组算法。复制拒绝循环引用及超过 64 层的数据，
+dict 的键必须是字符串，不复制普通 Python 实例或 dict views。
 
 ```javascript
 const live = get_python_list();
@@ -157,8 +147,6 @@ live.append(3);                      // 回写 Python
 const snapshot = Python.to_value(live);
 snapshot.push(4);                    // 只修改 JS 副本
 ```
-
-现有 JSValue 句柄仍遵守文档和 View 隔离，不能跨文档传入。
 
 运行示例：
 
