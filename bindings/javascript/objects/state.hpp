@@ -19,13 +19,13 @@ struct Session : std::enable_shared_from_this<Session> {
     std::string name;
     std::map<std::string, std::shared_ptr<Node>> nodes;
     std::vector<std::shared_ptr<Ref>> cursors;
-    std::vector<std::function<void()>> async_cleanup;
+    std::map<void *, std::function<void()>> async_cleanup;
     JSValueRef root = nullptr;
     void check() const;
     void invalidate() noexcept {
         closed = true;
         auto pending = std::exchange(async_cleanup, {});
-        for (auto &cancel : pending) { try { cancel(); } catch (...) {} }
+        for (auto &[key, cancel] : pending) { try { cancel(); } catch (...) {} }
         nodes.clear();
         for (auto &cursor : cursors) cursor->reset();
         cursors.clear();

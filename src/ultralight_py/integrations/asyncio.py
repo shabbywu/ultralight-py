@@ -17,7 +17,7 @@ def _associate(runtime):
     _main_thread()
     loop = asyncio.get_running_loop()
     previous = getattr(runtime, '_async_loop', None)
-    if previous is not None and previous is not loop:
+    if previous is not None and previous is not loop and not previous.is_closed():
         raise RuntimeError('Runtime is already associated with another asyncio loop')
     runtime._async_loop = loop
     if not hasattr(runtime, '_async_work'):

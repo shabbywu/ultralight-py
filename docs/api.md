@@ -1,4 +1,4 @@
-# 公开 API（0.2.0）
+# 公开 API（0.3.0）
 
 稳定入口为 `ultralight_py`；`_native`、下划线成员和内部包装构造器不属于公开接口。
 通过 Runtime 创建 View，通过 View 或 JSValue 获取 JSValue，通过绑定方法获取 PythonBinding。
@@ -95,4 +95,39 @@ closed 是状态查询，不会启动引擎操作；PythonBinding.closed 可从�
 `ultralight_py.integrations.tkinter.TkInputAdapter(widget, view, *, coordinate_transform=None, wheel_pixels=40)`
 只管理输入适配。close 解除自身绑定，释放借用引用，不关闭 View、Runtime 或控件。
 渲染、帧转换和定时驱动由宿主承担；普通包导入不依赖 tkinter 或 Pillow。
-所有回调与 JS/Python 函数调用均为同步接口，尚无 Promise/asyncio 桥接。
+事件回调为同步接口；Promise/asyncio 桥接见下节。
+
+## Promise 与 asyncio（0.3.0）
+
+`await JSValue.await_result()` 等待 JS Promise，返回需要关闭的 `JSValue`。
+非 Promise 抛出 `TypeError`；rejection 抛出带错误信息的 `JavaScriptError`。
+`await View.evaluate_async(source)` 求值并返回 Python 值，普通结果直接转换。
+`await JSValue.call_async(*args, this=None)` 返回 `JSValue`，普通结果也保持为句柄。
+导航或关闭使等待以 `UltralightError(code=ErrorCode.PageGone)` 结束。
+取消 Python 等待只解除桥接监听，JS Promise 本身继续执行。
+
+绑定函数和对象方法返回 awaitable 时，JS 获得 Promise。asyncio 调度 Python
+任务；完成值在后续 `Runtime.update()` 中送入 JS。异常使 Promise rejected。
+解绑、替换绑定、导航和关闭立即撤销投递，并请求取消桥接创建的 Task。
+传入的外部 Task/Future 只解除监听，不会被桥接取消。取消是协作式请求。
+
+```python
+from ultralight_py.integrations.asyncio import run, install
+
+run(main(), runtime=runtime, update_interval=1 / 60)
+
+# 已有运行中的 asyncio 循环：
+driver = install(runtime, update_interval=1 / 60)
+try:
+    result = await view.evaluate_async("Promise.resolve(42)")
+finally:
+    driver.close()
+```
+
+await 不隐式 update。自定义宿主可以自行调用 update，不必安装驱动器。
+首次异步操作关联当前循环；同一 Runtime 同时只允许一个循环和一个驱动器。
+引擎操作必须在主线程执行。驱动器只 update，不渲染，也不关闭传入的 Runtime。
+更新间隔是目标调度间隔；阻塞宿主线程或长时间执行 JS 会延迟更新。
+驱动器关闭或失败会终止关联的跨语言等待和投递；`run()` 传播驱动错误，
+退出时清理定时器、监听和任务。关闭驱动器后的 JS Promise 可能保持 pending。
+本版本不提供 Tk/asyncio 联合循环或 JS AbortSignal。

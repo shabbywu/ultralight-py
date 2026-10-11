@@ -5,7 +5,7 @@ Ultralight 2.x 的 Python 绑定，支持 CPU 离屏渲染、页面事件、Pyth
 以及鼠标、滚动和键盘输入。
 
 文档：[公开 API](docs/api.md) · [对象桥接与迁移](docs/objects.md) ·
-[架构与维护约定](docs/architecture.md) · [0.2.0 发布说明](CHANGELOG.md)。
+[架构与维护约定](docs/architecture.md) · [0.3.0 发布说明](CHANGELOG.md)。
 
 依赖通过 `externals/pybind11` 和 `externals/ulbind17` 子模块管理。
 需要 Python 3.10+、CMake 3.22+ 和支持 C++20 的编译器。
@@ -25,7 +25,7 @@ python -m pip install -e . -Ccmake.define.ULTRALIGHT_SDK_ROOT=/absolute/path/to/
 ```
 
 当前实际验收环境为 macOS ARM64、普通 GIL Python 3.13.16。包要求 Python 3.10+，
-其他 Python 版本尚未逐版本完成当前 0.2.0 验收；
+其他 Python 版本尚未逐版本完成当前 0.3.0 验收；
 Linux x64、Windows x64 保留依赖的构建支持，尚未完成 Python 绑定实测验收。
 pybind11 固定 v3.0.4，ulbind17 固定 `670910c`，默认 SDK 固定 2.0.0-beta.2。
 
@@ -295,7 +295,7 @@ python examples/tkinter_view.py --smoke
 ```sh
 python -m pip install build
 python -m build -Ccmake.define.ULTRALIGHT_SDK_ROOT=/absolute/path/to/sdk
-python -m pip install --force-reinstall --no-index --find-links=dist 'ultralight-py==0.2.0'
+python -m pip install --force-reinstall --no-index --find-links=dist 'ultralight-py==0.3.0'
 python -m pytest tests -q
 ```
 
@@ -307,7 +307,7 @@ sdist 包含固定子模块的源码，不要求消费者另行拉取子模块�
 覆盖离屏渲染、导航、回调释放、线程、异常、HTTP、本地/虚拟资源、输入重入、对象隔离、实时容器、绑定撤销及退出清理。
 Tk 测试同时覆盖模拟平台事件和真实窗口；缺少 Tk 或显示服务时跳过真实窗口用例。
 
-后续范围：JS 类构造器、Promise/asyncio 和其他平台实测。
+后续范围：JS 类构造器、Tk/asyncio 联合循环和其他平台实测。
 
 
 ## macOS Tk 开发环境
@@ -329,3 +329,6 @@ python -m venv .venv
 重建已有 `.venv` 前先将旧目录移入 `build/` 备份。
 `python -m tkinter` 必须能创建窗口；仅安装 Python 的 tkinter 源码不代表 `_tkinter` 扩展可用。
 这套解释器用于开发和实际窗口验收，发行包仍声明 Python 3.10+。
+
+Promise／asyncio 双向桥接与可选定时驱动见 [API 文档](docs/api.md)
+和 [示例](examples/async_bridge.py)。

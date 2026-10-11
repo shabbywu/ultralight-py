@@ -38,3 +38,10 @@ Renderer 每进程唯一，关闭后不能重建。引擎操作限定 Python 主
 Python 对象在绑定或文档失效时释放，不保证 JS GC 及时释放。
 尚无 JS 类构造器、Promise/asyncio、GPU View、零复制像素或输入法预编辑。
 成员白名单只限制根对象，不递归限制整个对象图。
+
+## 0.3.0
+
+- Add JS Promise waiting, async evaluation/calls, and optional asyncio runtime driver.
+- Convert bound Python awaitables to document- and binding-scoped JS Promises.
+- Revoke asynchronous work on cancellation, unbinding, navigation and close.
+- Add bidirectional example, types and real SDK lifecycle tests; retain pinned dependencies.
