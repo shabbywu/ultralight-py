@@ -1,7 +1,8 @@
 # ultralight-py
 
 Ultralight 2.x 的 Python 绑定，支持 CPU 离屏渲染、页面事件、Python/JavaScript
-双向函数调用、文档级 JS 句柄、Python 虚拟资源加载，以及鼠标、滚动和键盘输入。
+双向函数调用、Python 实例与容器实时代理、文档级 JS 句柄、Python 虚拟资源加载，
+以及鼠标、滚动和键盘输入。
 
 依赖通过 `externals/pybind11` 和 `externals/ulbind17` 子模块管理。
 需要 Python 3.10+、CMake 3.22+ 和支持 C++20 的编译器。
@@ -22,7 +23,7 @@ python -m pip install -e . -Ccmake.define.ULTRALIGHT_SDK_ROOT=/absolute/path/to/
 
 当前实际验收环境为 macOS ARM64、Python 3.13。包要求 Python 3.10+；
 Linux x64、Windows x64 保留依赖的构建支持，尚未完成 Python 绑定实测验收。
-pybind11 固定 v3.0.4，ulbind17 固定 `4774830`，默认 SDK 固定 2.0.0-beta.2。
+pybind11 固定 v3.0.4，ulbind17 固定 `670910c`，默认 SDK 固定 2.0.0-beta.2。
 
 ## 最小离屏闭环
 
@@ -57,6 +58,7 @@ with Runtime() as runtime:
 python examples/offscreen.py
 python examples/bridge.py
 python examples/resources.py
+python examples/objects.py
 python -m pytest tests -q
 ```
 
@@ -93,7 +95,7 @@ python -m pytest tests -q
 原生诊断提供 `code`、`stack`、`source_url`、`line` 和 `column`。
 Python 参数类型错误使用 `TypeError`/`ValueError`，整数超范围使用 `OverflowError`。
 
-Python 函数的异常转为页面中的 JS Error。页面事件和资源 loader 的异常被隔离，
+Python 函数、实例方法及属性访问的异常转为页面中的 JS Error。页面事件和资源 loader 的异常被隔离，
 交给 `runtime.set_error_handler(callback)`；资源错误在后续 `update()` 或关闭时派发。
 默认通过 `sys.unraisablehook` 报告，传入 `None` 可恢复默认处理。
 错误处理器自身的异常也通过该 hook 报告，不会跨 SDK 边界抛出。
@@ -124,22 +126,56 @@ with view.evaluate_handle("({offset:10, add(n){return this.offset+n}})") as obj:
 `get(str_or_int)`、`set(key, value)`、`keys()`、`call(*args, this=None)` 和 `to_python()`。
 `get()` 和 `call()` 返回句柄，显式指定 `this` 可保留方法的 receiver。
 `set()`/`call()` 的单个值以及 Python callable 的返回值可以是同文档 JSValue。
-容器中的嵌套 JSValue 不属于基础容器转换范围。
+实时 Python 容器中的 JSValue 也会在访问时检查所属文档；显式按值复制不转换 JSValue。
 
 | Python | JavaScript |
 | --- | --- |
 | `None` | null |
 | `ultralight_py.undefined` | undefined |
 | bool | Boolean |
-| int、float | Number；JS Number 返回 Python float |
+| int、float | Number；JS 安全整数返回 int，其余返回 float |
 | str | String，保留 Unicode 和内嵌 NUL |
-| list、tuple | Array；稀疏数组的空洞转换为 undefined |
-| 字符串键 dict | 无原型的数据对象，`__proto__` 作为普通键 |
+| list、tuple | 实时 Python 代理；普通 JS Array 回传时复制为 list |
+| dict | 实时 Python 映射代理，保留 Python 键类型 |
+| 普通实例、callable | 属性/方法代理或可调用代理；回传时恢复原对象 |
 
 Python int 必须位于 ±(2⁵³−1)，不进行隐式字符串/数字转换。JS 数组与普通对象递归转换为
-list/dict；函数、Promise、Date 等特殊对象通过 JSValue 使用。循环引用或超过 64 层的容器
-报 `TraversalLimit`。重复的兄弟节点允许转换，但转换结果不保留对象别名。
+list/dict；函数、Promise、Date 等原生 JS 特殊对象通过 JSValue 使用。普通 JS 容器的循环引用或超过
+64 层的转换报 `TraversalLimit`，按值转换不保留对象别名。Python 代理支持循环引用，
+回传 Python 时恢复原对象。
 对象转换会读取自有可枚举字符串属性，可能执行 getter；`keys()` 不读取属性值。
+
+## Python 对象与实时容器
+
+```python
+class Counter:
+    def __init__(self, value):
+        self.value = value
+        self.history = []
+
+    def increment(self):
+        self.value += 1
+        self.history.append(self.value)
+        return self.value
+
+left, right = Counter(0), Counter(100)
+left_binding = view.bind_object("left", left)
+right_binding = view.bind_object("right", right)
+view.evaluate("left.increment(); right.increment()")
+assert (left.value, right.value) == (1, 101)
+assert view.evaluate("left.history") is left.history
+left_binding.close()
+```
+
+自动暴露公开属性、property 和方法；可通过 `members=[...]` 收窄根对象成员。
+同类实例的方法与状态分别管理，每个绑定内部保持对象身份，解除绑定使已导出的嵌套代理和方法失效。
+主框架导航后重新绑定；View 持有 PythonBinding，丢弃句柄不会解除绑定。
+
+**0.2.0 有转换行为变更**：Python list/dict/tuple 统一使用实时代理，
+包括函数返回值和 JSValue 的参数。JS 使用 Python 的 `append`、`get` 等方法，
+严格索引使用 `Python.getitem/setitem/delitem`，不模拟 JS Array/Object。
+需要普通 JS 数据时使用 `Python.to_value()` 显式复制。
+完整 API、身份和释放规则见 [对象桥接与迁移说明](docs/objects.md)。
 
 ## 资源加载
 
@@ -246,26 +282,26 @@ python examples/tkinter_view.py
 python examples/tkinter_view.py --smoke
 ```
 
-示例包含按钮、文本框、滚动区域和事件记录，使用标准库将不透明 BGRA 帧转换为 PPM，
+示例包含两个 Python Counter 模型分别控制的按钮、文本框、滚动区域和事件记录，使用标准库将不透明 BGRA 帧转换为 PPM，
 通过 Tk Canvas 显示。渲染、窗口尺寸更新和关闭顺序由示例宿主管理。
-`--smoke` 创建真实窗口并检查帧尺寸、颜色及 Canvas 图像后自动退出，需要可用的图形环境。
+`--smoke` 创建真实窗口并检查帧尺寸、颜色、Canvas 图像及 Python 模型隔离后自动退出，需要可用的图形环境。
 
 ## 构建与测试发行包
 
 ```sh
 python -m pip install build
 python -m build -Ccmake.define.ULTRALIGHT_SDK_ROOT=/absolute/path/to/sdk
-python -m pip install dist/ultralight_py-*.whl
+python -m pip install --force-reinstall --no-index --find-links=dist 'ultralight-py==0.2.0'
 python -m pytest tests -q
 ```
 
 wheel 包含原生扩展和 UltralightCore、WebCore、Ultralight 动态库，以及内嵌资源。
 sdist 包含固定子模块的源码，不要求消费者另行拉取子模块。离线构建应显式提供 SDK；
 默认下载复用 ulbind17 的版本固定、校验和缓存逻辑。测试以子进程隔离每个 Runtime 场景，
-覆盖离屏渲染、导航、回调释放、线程、异常、HTTP、本地/虚拟资源、输入重入及退出清理。
+覆盖离屏渲染、导航、回调释放、线程、异常、HTTP、本地/虚拟资源、输入重入、对象隔离、实时容器、绑定撤销及退出清理。
 Tk 测试同时覆盖模拟平台事件和真实窗口；缺少 Tk 或显示服务时跳过真实窗口用例。
 
-后续范围：Python 对象代理、Promise/asyncio 和其他平台实测。
+后续范围：JS 类构造器、Promise/asyncio 和其他平台实测。
 
 
 ## macOS Tk 开发环境
