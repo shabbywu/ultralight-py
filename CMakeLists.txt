@@ -14,7 +14,7 @@ add_subdirectory(externals/pybind11)
 add_subdirectory(externals/ulbind17 EXCLUDE_FROM_ALL)
 
 pybind11_add_module(_native MODULE bindings/module.cpp)
-target_link_libraries(_native PRIVATE ulbind17::header)
+target_link_libraries(_native PRIVATE ulbind17::ulbind17)
 ulbind17_copy_runtime_files(_native INCLUDE_APPCORE OFF)
 install(TARGETS _native LIBRARY DESTINATION ultralight_py RUNTIME DESTINATION ultralight_py)
 foreach(library IN ITEMS UltralightCore WebCore Ultralight)
