@@ -6,7 +6,8 @@ import sys
 import pytest
 
 
-@pytest.mark.parametrize('case', ['pointer'])
+@pytest.mark.parametrize('case', ['pointer', 'keyboard', 'guards', 'close_view', 'close_runtime',
+                                  'resource_guard'])
 def test_input_integration(case, tmp_path):
     env = os.environ.copy()
     if env.get('PYTHONPATH'):

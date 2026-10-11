@@ -1,5 +1,7 @@
-from .input import (InputView as _InputView, MouseButton as MouseButton, MouseEvent as MouseEvent,
-                    MouseEventType as MouseEventType, ScrollEvent as ScrollEvent, ScrollEventType as ScrollEventType)
+from .input import (InputView as _InputView, KeyCode as KeyCode, KeyEvent as KeyEvent,
+                    KeyEventType as KeyEventType, Modifiers as Modifiers, MouseButton as MouseButton,
+                    MouseEvent as MouseEvent, MouseEventType as MouseEventType,
+                    ScrollEvent as ScrollEvent, ScrollEventType as ScrollEventType)
 from os import PathLike
 from typing import Any, Callable, TypedDict
 from enum import Enum

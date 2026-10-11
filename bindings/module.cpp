@@ -4,6 +4,7 @@
 #include "view/bindings.hpp"
 #include "javascript/bindings.hpp"
 #include "input/bindings.hpp"
+#include "input/keyboard_bindings.hpp"
 
 PYBIND11_MODULE(_native, module) {
   module.doc() = "Python bindings for Ultralight.";
@@ -13,4 +14,5 @@ PYBIND11_MODULE(_native, module) {
   binding::register_view(module);
   binding::register_javascript(module);
   binding::register_input(module);
+  binding::register_keyboard_input(module);
 }

@@ -5,7 +5,7 @@ import threading
 import time
 import weakref
 
-from ultralight_py import (ErrorCode,
+from ultralight_py import (ErrorCode, KeyCode, KeyEvent, KeyEventType, Modifiers,
                           MouseButton, MouseEvent, MouseEventType, Runtime,
                           ScrollEvent, ScrollEventType, UltralightError)
 
@@ -85,6 +85,107 @@ def pointer():
             expect(ErrorCode.Closed, callback)
 
 
+def keyboard():
+    with Runtime() as runtime:
+        view = page(runtime)
+        view.click(20, 65); assert view.has_input_focus
+        view.key_down(KeyCode.GK_A)
+        assert view.evaluate("i.value") == ""
+        view.input_text("a中文🐉")
+        view.key_up(KeyCode.GK_A)
+        assert view.evaluate("i.value") == "a中文🐉"
+        view.fire_key_event(KeyEvent(KeyEventType.RAW_KEY_DOWN, KeyCode.GK_A, modifiers=Modifiers.SHIFT,
+                                     is_auto_repeat=True))
+        view.fire_key_event(KeyEvent(KeyEventType.CHAR, text="A", unmodified_text="a", modifiers=Modifiers.SHIFT))
+        view.key_up(KeyCode.GK_A)
+        assert view.evaluate("i.value") == "a中文🐉A"
+        assert view.evaluate("events.some(e=>e.type==='keydown'&&e.shift&&e.repeat)")
+        view.key_down(KeyCode.GK_SHIFT, modifiers=Modifiers.SHIFT)
+        view.mouse_move(20, 65)
+        assert view.evaluate("events.at(-1).shift")
+        view.key_up(KeyCode.GK_SHIFT)
+        view.mouse_move(21, 65)
+        assert not view.evaluate("events.at(-1).shift")
+        view.key_down(KeyCode.GK_BACK); view.key_up(KeyCode.GK_BACK)
+        assert view.evaluate("i.value") == "a中文🐉"
+        view.input_text("")
+        view.close()
+        expect(ErrorCode.Closed, lambda: view.input_text(""))
+
+
+def guards():
+    with Runtime() as runtime:
+        view = page(runtime)
+        errors = []
+        def worker():
+            try:
+                expect(ErrorCode.WrongThread, lambda: view.click(0, 0))
+                expect(ErrorCode.WrongThread, lambda: view.has_focus)
+            except BaseException as error:
+                errors.append(error)
+        thread = threading.Thread(target=worker); thread.start(); thread.join()
+        assert not errors, errors
+        called = []
+        def host():
+            called.append(True)
+            expect(ErrorCode.Busy, lambda: view.click(20, 20))
+            expect(ErrorCode.Busy, runtime.update)
+            expect(ErrorCode.Busy, runtime.render)
+            assert view.evaluate("clicks") >= 1
+        view.bind_function("host", host)
+        view.click(20, 20)
+        assert called
+        # Calling a host function from evaluate also holds a Bridge scope.
+        def bridge_host():
+            expect(ErrorCode.Busy, view.focus)
+        view.bind_function("bridge_host", bridge_host)
+        view.evaluate("bridge_host()")
+        view.focus(); frame(runtime)
+        runtime.set_error_handler(errors.append)
+        view.bind_function("host", lambda: (_ for _ in ()).throw(ValueError("input callback failed")))
+        view.click(20, 20)
+        assert view.evaluate("clicks") >= 2
+        # A host exception becomes a JS exception and does not escape dispatch.
+        frame(runtime)
+        view.focus()
+
+
+def closing(runtime_close=False):
+    runtime = Runtime()
+    view = page(runtime)
+    called = []
+    def close():
+        called.append(True)
+        runtime.close() if runtime_close else view.close()
+    view.bind_function("host", close)
+    view.click(20, 20)
+    assert called and view.closed
+    expect(ErrorCode.Closed, view.focus)
+    runtime.close()
+
+
+def resource_guard():
+    attempts = []
+    view = None
+    def loader(path):
+        if path == 'input.html':
+            return b'<script src="input.js"></script>'
+        if path.endswith('input.js'):
+            expect(ErrorCode.Busy, view._native.focus)
+            attempts.append(True)
+            return b'globalThis.resourceInput=42'
+        return None
+    with Runtime(resource_loader=loader) as runtime:
+        view = runtime.create_view(320, 240)
+        ready = []
+        view.set_callbacks(dom_ready=lambda event: ready.append(event))
+        view.load_url('file:///input.html')
+        pump(runtime, lambda: ready)
+        assert attempts and view.evaluate('resourceInput') == 42
+
+
 
 if __name__ == '__main__':
-    pointer()
+    {'pointer': pointer, 'keyboard': keyboard, 'guards': guards,
+     'close_view': closing, 'close_runtime': lambda: closing(True),
+     'resource_guard': resource_guard}[sys.argv[1]]()

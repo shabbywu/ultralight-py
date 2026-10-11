@@ -10,5 +10,7 @@ __all__ = [
     "LoadFailure", "UltralightError", "JavaScriptError", "ErrorCode", "undefined",
 ]
 
-from .input import MouseButton, MouseEvent, MouseEventType, ScrollEvent, ScrollEventType
-__all__ += ["MouseButton", "MouseEvent", "MouseEventType", "ScrollEvent", "ScrollEventType"]
+from .input import (KeyCode, KeyEvent, KeyEventType, Modifiers, MouseButton, MouseEvent,
+                    MouseEventType, ScrollEvent, ScrollEventType)
+__all__ += ["KeyCode", "KeyEvent", "KeyEventType", "Modifiers", "MouseButton", "MouseEvent",
+            "MouseEventType", "ScrollEvent", "ScrollEventType"]
