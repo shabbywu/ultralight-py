@@ -5,9 +5,10 @@ from dataclasses import replace
 import tkinter as tk
 from typing import Callable
 
-from ..api import ErrorCode, UltralightError, View
-from .._support import _main_thread
-from ..input import KeyCode, KeyEvent, KeyEventType, Modifiers, MouseButton, _integer
+from ultralight_py.api import ErrorCode, UltralightError, View
+from ultralight_py import _support
+from ultralight_py import _validation
+from ultralight_py.input import KeyCode, KeyEvent, KeyEventType, Modifiers, MouseButton
 
 _KEYS = {
     "BackSpace": "BACK", "Tab": "TAB", "ISO_Left_Tab": "TAB", "Return": "RETURN",
@@ -66,10 +67,10 @@ class TkInputAdapter:
     def __init__(self, widget: tk.Misc, view: View, *,
                  coordinate_transform: Callable[[int, int], tuple[int, int]] | None = None,
                  wheel_pixels: int = 40):
-        _main_thread()
+        _support.ensure_in_main_thread()
         if coordinate_transform is not None and not callable(coordinate_transform):
             raise TypeError("coordinate_transform must be callable or None")
-        _integer(wheel_pixels, "wheel_pixels")
+        _validation.integer(wheel_pixels, "wheel_pixels")
         if wheel_pixels <= 0:
             raise ValueError("wheel_pixels must be positive")
         self._widget = widget
@@ -262,7 +263,7 @@ class TkInputAdapter:
         self._pending.clear()
 
     def close(self) -> None:
-        _main_thread()
+        _support.ensure_in_main_thread()
         if self._closed:
             return
         self._closed = True

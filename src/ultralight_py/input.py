@@ -4,8 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import IntEnum, IntFlag
 
-from . import _native
-from ._support import _call
+from ultralight_py import _native
+from ultralight_py import _support
+from ultralight_py import _validation
 
 
 class MouseEventType(IntEnum):
@@ -46,13 +47,6 @@ class Modifiers(IntFlag):
 KeyCode = IntEnum("KeyCode", dict(_native._key_codes), module=__name__)
 
 
-def _integer(value: int, name: str) -> None:
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise TypeError(f"{name} must be an integer")
-    if not -(2**31) <= value < 2**31:
-        raise OverflowError(f"{name} exceeds the SDK int range")
-
-
 def _enum(value, kind) -> None:
     if not isinstance(value, kind):
         raise TypeError(f"Expected {kind.__name__}")
@@ -74,8 +68,8 @@ class MouseEvent:
     def __post_init__(self):
         _enum(self.type, MouseEventType)
         _enum(self.button, MouseButton)
-        _integer(self.x, "x")
-        _integer(self.y, "y")
+        _validation.integer(self.x, "x")
+        _validation.integer(self.y, "y")
         if self.type != MouseEventType.MOVE and self.button == MouseButton.NONE:
             raise ValueError("Mouse down/up requires a button")
 
@@ -91,7 +85,7 @@ class ScrollEvent:
     def __post_init__(self):
         _enum(self.type, ScrollEventType)
         for name in ("delta_x", "delta_y", "x", "y"):
-            _integer(getattr(self, name), name)
+            _validation.integer(getattr(self, name), name)
 
 
 @dataclass(frozen=True)
@@ -110,8 +104,8 @@ class KeyEvent:
     def __post_init__(self):
         _enum(self.type, KeyEventType)
         _modifiers(self.modifiers)
-        _integer(self.virtual_key_code, "virtual_key_code")
-        _integer(self.native_key_code, "native_key_code")
+        _validation.integer(self.virtual_key_code, "virtual_key_code")
+        _validation.integer(self.native_key_code, "native_key_code")
         if self.key_identifier is not None and not isinstance(self.key_identifier, str):
             raise TypeError("key_identifier must be str or None")
         for name in ("text", "unmodified_text"):
@@ -126,7 +120,7 @@ class InputView:
     """Input methods shared by the public View, with no window-framework state."""
 
     def _input_call(self, name, *args):
-        return _call(getattr(self._native, name), *args)
+        return _support.call(getattr(self._native, name), *args)
 
     def fire_mouse_event(self, event: MouseEvent) -> None:
         if not isinstance(event, MouseEvent):
@@ -153,11 +147,11 @@ class InputView:
 
     @property
     def has_focus(self) -> bool:
-        return _call(lambda: self._native.has_focus)
+        return _support.call(lambda: self._native.has_focus)
 
     @property
     def has_input_focus(self) -> bool:
-        return _call(lambda: self._native.has_input_focus)
+        return _support.call(lambda: self._native.has_input_focus)
 
     def mouse_move(self, x: int, y: int, *, button: MouseButton = MouseButton.NONE) -> None:
         self.fire_mouse_event(MouseEvent(MouseEventType.MOVE, x, y, button))

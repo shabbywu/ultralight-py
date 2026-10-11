@@ -13,7 +13,15 @@ Python 层提供公开 API、Python 语义和可选宿主集成。现有分层�
 ## Python 依赖
 
 `__init__.py` 和对应 stub 只汇总公开导出。`api.py` 提供 Runtime/View/JSValue；
-`input.py` 提供数据与输入 mixin；`objects.py` 提供 PythonBinding 和原生代理调用的 Python 策略。
+`input.py` 提供数据与输入 mixin；`objects.py` 提供 PythonBinding。
+共享的内部实现通过私有模块导入：`_objects.py` 提供原生代理的成员策略和运算，
+`_asyncio.py` 管理循环关联、Promise 等待和延迟投递，`_validation.py` 提供输入校验，
+`_support.py` 提供主线程检查和原生调用封装。
+`integrations/asyncio.py` 保留公开的 Driver、install 和 run 接口。
+私有模块中的辅助函数不使用下划线前缀；调用方只导入模块，使用
+`_support.call(...)`、`_asyncio.await_result(...)` 等形式访问。
+导入统一放在模块顶部并使用绝对路径。相互引用的模块先导入模块对象，
+在函数运行时访问类型属性，避免初始化期间读取尚未定义的类型。
 三者共用 `_support.py` 的主线程入口与 finally 清理，不让输入或绑定关闭反向依赖 api。
 `objects._unwrap()` 为识别公共 JSValue 延迟导入其类型；这是运行时转换的依赖，不参与模块初始化。
 

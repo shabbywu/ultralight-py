@@ -6,10 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence
 
-from . import _native
-from .input import InputView
-from ._support import _call, _main_thread
-from .objects import PythonBinding, _members
+from ultralight_py import _native
+from ultralight_py import _asyncio
+from ultralight_py import _objects
+from ultralight_py import _support
+from ultralight_py.input import InputView
+from ultralight_py.objects import PythonBinding
 
 UltralightError = _native.UltralightError
 JavaScriptError = _native.JavaScriptError
@@ -53,7 +55,7 @@ class Runtime:
     _instance: Runtime | None = None
 
     def __new__(cls, *, assets_root=None, resource_loader=None):
-        _main_thread()
+        _support.ensure_in_main_thread()
         _callable(resource_loader, "resource_loader")
         current = cls._instance
         if current is not None:
@@ -67,7 +69,7 @@ class Runtime:
         self = super().__new__(cls)
         self._assets_root = Path.cwd() if assets_root is None else Path(assets_root).resolve()
         self._resource_loader = resource_loader
-        self._native = _call(_native._Runtime.create, str(self._assets_root), resource_loader)
+        self._native = _support.call(_native._Runtime.create, str(self._assets_root), resource_loader)
         self._native.set_error_handler(_report)
         cls._instance = self
         return self
@@ -77,38 +79,36 @@ class Runtime:
         return self._native.closed
 
     def create_view(self, width: int, height: int, *, transparent: bool = False) -> View:
-        return View(_call(self._native.create_view, _dimension(width), _dimension(height), transparent))
+        return View(_support.call(self._native.create_view, _dimension(width), _dimension(height), transparent))
 
     def update(self) -> None:
-        _main_thread()
-        from .integrations.asyncio import _flush
-        _flush(self)
-        _call(self._native.update)
+        _support.ensure_in_main_thread()
+        _asyncio.flush(self)
+        _support.call(self._native.update)
 
     def refresh_display(self, display_id: int = 0) -> None:
-        _call(self._native.refresh_display, display_id)
+        _support.call(self._native.refresh_display, display_id)
 
     def render(self) -> None:
-        _call(self._native.render)
+        _support.call(self._native.render)
 
     def set_error_handler(self, callback: Callable | None) -> None:
         _callable(callback, "callback")
-        _call(self._native.set_error_handler, _report if callback is None else callback)
+        _support.call(self._native.set_error_handler, _report if callback is None else callback)
 
     def close(self) -> None:
         try:
-            _call(self._native.close)
+            _support.call(self._native.close)
         finally:
             if self.closed:
-                from .integrations.asyncio import _stop
-                _stop(self, _native._make_error(ErrorCode.Closed, "Runtime closed"))
+                _asyncio.stop(self, _native._make_error(ErrorCode.Closed, "Runtime closed"))
                 driver = getattr(self, "_async_driver", None)
                 if driver is not None:
                     driver.close()
                 self._resource_loader = None
 
     def __enter__(self) -> Runtime:
-        _main_thread()
+        _support.ensure_in_main_thread()
         if self.closed:
             raise _native._make_error(ErrorCode.Closed, "Runtime is closed")
         return self
@@ -128,13 +128,13 @@ class View(InputView):
         return self._native.closed
 
     def load_html(self, html: str, url: str = "") -> None:
-        _call(self._native.load_html, html, url)
+        _support.call(self._native.load_html, html, url)
 
     def load_url(self, url: str) -> None:
-        _call(self._native.load_url, url)
+        _support.call(self._native.load_url, url)
 
     def resize(self, width: int, height: int) -> None:
-        _call(self._native.resize, _dimension(width), _dimension(height))
+        _support.call(self._native.resize, _dimension(width), _dimension(height))
 
     def set_callbacks(self, *, begin_loading=None, window_ready=None, dom_ready=None,
                       finish_loading=None, fail_loading=None, console=None) -> None:
@@ -143,10 +143,10 @@ class View(InputView):
                          fail_loading=fail_loading, console=console)
         for name, callback in callbacks.items():
             _callable(callback, name)
-        _call(self._native.set_callbacks, callbacks)
+        _support.call(self._native.set_callbacks, callbacks)
 
     def evaluate_handle(self, source: str) -> JSValue:
-        return JSValue(_call(self._native.evaluate_handle, source))
+        return JSValue(_support.call(self._native.evaluate_handle, source))
 
     def evaluate(self, source: str):
         with self.evaluate_handle(source) as value:
@@ -154,7 +154,7 @@ class View(InputView):
 
     async def evaluate_async(self, source: str):
         with self.evaluate_handle(source) as value:
-            if _call(value._native.is_promise):
+            if _support.call(value._native.is_promise):
                 with await value.await_result() as result:
                     return result.to_python()
             return value.to_python()
@@ -169,14 +169,14 @@ class View(InputView):
             members = tuple(members)
             if any(not isinstance(member, str) or member.startswith("_") for member in members):
                 raise ValueError("members must contain public names")
-            if set(members) - set(_members(instance)):
+            if set(members) - set(_objects.members(instance)):
                 raise ValueError("members contains an unknown Python member")
-        return PythonBinding(_call(self._native.bind_object, name, instance, members))
+        return PythonBinding(_support.call(self._native.bind_object, name, instance, members))
 
     def unbind(self, name: str) -> None:
         if not isinstance(name, str):
             raise TypeError("Binding name must be str")
-        _call(self._native.unbind, name)
+        _support.call(self._native.unbind, name)
 
     def bind_function(self, name: str, callback: Callable) -> PythonBinding:
         if not callable(callback):
@@ -184,16 +184,16 @@ class View(InputView):
         return self.bind_object(name, callback)
 
     def copy_pixels(self) -> PixelBuffer:
-        return PixelBuffer(**_call(self._native.copy_pixels))
+        return PixelBuffer(**_support.call(self._native.copy_pixels))
 
     def clear_dirty_bounds(self) -> None:
-        _call(self._native.clear_dirty_bounds)
+        _support.call(self._native.clear_dirty_bounds)
 
     def close(self) -> None:
-        _call(self._native.close)
+        _support.call(self._native.close)
 
     def __enter__(self) -> View:
-        _main_thread()
+        _support.ensure_in_main_thread()
         if self.closed:
             raise _native._make_error(ErrorCode.Closed, "View is closed")
         return self
@@ -218,24 +218,23 @@ class JSValue:
         return self._native.closed
 
     def get(self, key: str | int) -> JSValue:
-        return JSValue(_call(self._native.get, key))
+        return JSValue(_support.call(self._native.get, key))
 
     def set(self, key: str | int, value) -> None:
-        _call(self._native.set, key, value)
+        _support.call(self._native.set, key, value)
 
     def keys(self) -> list[str]:
-        return _call(self._native.keys)
+        return _support.call(self._native.keys)
 
     def call(self, *args, this: JSValue | None = None) -> JSValue:
-        return JSValue(_call(self._native.call, *args, this=this))
+        return JSValue(_support.call(self._native.call, *args, this=this))
 
     async def await_result(self) -> JSValue:
-        from .integrations.asyncio import _await
-        return await _await(self)
+        return await _asyncio.await_result(self)
 
     async def call_async(self, *args, this: JSValue | None = None) -> JSValue:
         result = self.call(*args, this=this)
-        if _call(result._native.is_promise):
+        if _support.call(result._native.is_promise):
             try:
                 return await result.await_result()
             finally:
@@ -243,13 +242,13 @@ class JSValue:
         return result
 
     def to_python(self):
-        return _call(self._native.to_python)
+        return _support.call(self._native.to_python)
 
     def close(self) -> None:
-        _call(self._native.close)
+        _support.call(self._native.close)
 
     def __enter__(self) -> JSValue:
-        _main_thread()
+        _support.ensure_in_main_thread()
         if self.closed:
             raise _native._make_error(ErrorCode.PageGone, "JSValue is closed")
         return self

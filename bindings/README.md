@@ -23,7 +23,7 @@ Python 引用释放仍由 `python/references.hpp` 的延迟队列执行，
 
 Tkinter 的平台事件转换和控件绑定位于 `src/ultralight_py/integrations/`，不进入原生绑定。
 
-对象成员发现与运算语义位于 `src/ultralight_py/objects.py`；原生层负责会话、GIL、
+对象成员发现与运算语义位于 `src/ultralight_py/_objects.py`；原生层负责会话、GIL、
 句柄和延迟引用释放。JS 代理 payload 仅持有弱引用，文档失效时先撤销会话再释放 Python 引用。
 
 完整持有关系、清理规则和维护边界见 [架构与维护约定](../docs/architecture.md)。

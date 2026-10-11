@@ -1,5 +1,5 @@
 from typing import Any, Coroutine, TypeVar
-from ..api import Runtime
+from ultralight_py.api import Runtime
 _T = TypeVar('_T')
 class Driver:
     runtime: Runtime

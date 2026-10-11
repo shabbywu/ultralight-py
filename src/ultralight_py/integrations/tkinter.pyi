@@ -1,6 +1,6 @@
 import tkinter as tk
 from typing import Callable
-from ..api import View
+from ultralight_py.api import View
 
 class TkInputAdapter:
     def __init__(self, widget: tk.Misc, view: View, *,

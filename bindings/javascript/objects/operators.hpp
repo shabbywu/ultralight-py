@@ -19,7 +19,7 @@ inline JSValueRef helper_call(const std::weak_ptr<Document> &weak, std::span<con
         if (operation == "getattr") {
             if (positional.size() != 2) throw py::type_error("getattr expects an object and a member name");
             auto original = doc->find(b->at(args[1], 0));
-            result = policy(doc).attr("_member")(positional[0], positional[1],
+            result = policy(doc).attr("member")(positional[0], positional[1],
                 original && original->members ? original->members->object() : py::none());
         } else if (operation == "to_value") {
             if (positional.size() != 1) throw py::type_error("to_value expects one object");
@@ -27,7 +27,7 @@ inline JSValueRef helper_call(const std::weak_ptr<Document> &weak, std::span<con
         } else if (operation == "iter") {
             if (positional.size() != 1) throw py::type_error("iter expects one object");
             return make_iterator(scope, *b, positional[0]);
-        } else result = policy(doc).attr("_operate")(operation, positional);
+        } else result = policy(doc).attr("operate")(operation, positional);
         if (scope->closed || !b->active()) return nullptr;
         return scope->convert(*b, result)->value();
     } catch (py::error_already_set &error) { throw Error(Code::HostException, error.what()); }

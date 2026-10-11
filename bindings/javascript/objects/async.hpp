@@ -53,7 +53,7 @@ inline std::unique_ptr<Bridge::Handle> async_result(const std::shared_ptr<Sessio
     scope->async_cleanup[delivery.get()] = [weak = std::weak_ptr<Delivery>(delivery)] {
         if (auto d = weak.lock()) d->invalidate();
     };
-    py::module_::import("ultralight_py.integrations.asyncio").attr("_start")(value, py::cast(delivery));
+    py::module_::import("ultralight_py._asyncio").attr("start")(value, py::cast(delivery));
     return root;
 }
 } // namespace binding::objects

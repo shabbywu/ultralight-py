@@ -16,7 +16,7 @@ inline JSValueRef node_call(const std::weak_ptr<Node> &weak, std::span<const JSV
         py::object result;
         if (operation == "guard") return bridge->makeUndefined();
         if (operation == "has" || operation == "keys") {
-            auto names = policy(doc).attr("_members")(object, allowed);
+            auto names = policy(doc).attr("members")(object, allowed);
             if (operation == "has") {
                 ulbind17::jsc::Traversal walk;
                 auto key = from_js(*bridge, args[1], walk);
@@ -32,10 +32,10 @@ inline JSValueRef node_call(const std::weak_ptr<Node> &weak, std::span<const JSV
         } else {
             ulbind17::jsc::Traversal walk;
             auto name = from_js(*bridge, args[1], walk);
-            if (operation == "get") result = policy(doc).attr("_member")(object, name, allowed);
+            if (operation == "get") result = policy(doc).attr("member")(object, name, allowed);
             else if (operation == "set") {
                 auto item = from_js(*bridge, args[2], walk);
-                policy(doc).attr("_set")(object, name, item, allowed);
+                policy(doc).attr("set_member")(object, name, item, allowed);
                 result = py::none();
             } else throw py::value_error("Unknown Python proxy operation");
         }
@@ -54,10 +54,10 @@ inline std::unique_ptr<Bridge::Handle> Session::convert(Bridge &b, py::handle va
         ulbind17::jsc::Traversal walk; return copy_to_js(b, value, walk);
     }
     auto doc = document.lock();
-    auto unwrapped = policy(doc).attr("_unwrap")(value);
+    auto unwrapped = policy(doc).attr("unwrap")(value);
     if (py::isinstance<HostValue>(unwrapped)) return HostValue::convert(b, unwrapped);
-    policy(doc).attr("_validate")(value);
-    auto key = py::str(policy(doc).attr("_identity")(value)).cast<std::string>();
+    policy(doc).attr("validate")(value);
+    auto key = py::str(policy(doc).attr("identity")(value)).cast<std::string>();
     auto found = nodes.find(key);
     if (found != nodes.end()) return b.retain(found->second->proxy->value());
     auto node = std::make_shared<Node>();

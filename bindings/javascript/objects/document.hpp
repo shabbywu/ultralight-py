@@ -8,7 +8,7 @@ inline std::shared_ptr<Document> document(Bridge &b) {
         documents.erase(found);
     }
     auto doc = std::make_shared<Document>(); doc->bridge = b.shared_from_this(); doc->registry_key = &b;
-    doc->policy = reference(py::module_::import("ultralight_py.objects"));
+    doc->policy = reference(py::module_::import("ultralight_py._objects"));
     doc->implicit = doc->session();
     doc->factory = without_gil([&] {
         ulbind17::jsc::String source(factory_source); return b.retain(b.evaluate(source));

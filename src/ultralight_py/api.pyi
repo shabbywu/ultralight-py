@@ -1,7 +1,7 @@
-from .input import InputView as _InputView
+from ultralight_py.input import InputView as _InputView
 from os import PathLike
 from typing import Any, Callable, ClassVar, Sequence, TypedDict
-from .objects import PythonBinding as PythonBinding
+from ultralight_py.objects import PythonBinding as PythonBinding
 
 class ErrorCode:
     InvalidArgument: ClassVar[ErrorCode]

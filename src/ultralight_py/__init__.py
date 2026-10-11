@@ -1,14 +1,14 @@
 """Python bindings for Ultralight."""
 
-from .api import (
+from ultralight_py.api import (
     ErrorCode, FrameEvent, JavaScriptError, JSValue, LoadFailure, PixelBuffer,
     Resource, Runtime, UltralightError, View, undefined,
 )
-from .input import (
+from ultralight_py.input import (
     KeyCode, KeyEvent, KeyEventType, Modifiers, MouseButton, MouseEvent,
     MouseEventType, ScrollEvent, ScrollEventType,
 )
-from .objects import PythonBinding
+from ultralight_py.objects import PythonBinding
 
 __all__ = [
     "Runtime", "View", "JSValue", "PythonBinding", "PixelBuffer", "Resource",
