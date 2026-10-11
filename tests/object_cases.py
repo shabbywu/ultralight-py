@@ -2,6 +2,7 @@
 import gc
 import sys
 import threading
+import time
 import weakref
 
 from ultralight_py import ErrorCode, JavaScriptError, Runtime, UltralightError, undefined
@@ -240,7 +241,20 @@ def cleanup():
         weak = weakref.ref(value)
         handle = view.bind_object("model", value)
         del value
+        observed, ready = [], threading.Event()
+        def observe():
+            ready.set()
+            deadline = time.monotonic() + 2
+            while not handle.closed:
+                if time.monotonic() > deadline:
+                    return
+                time.sleep(0.001)
+            observed.append(True)
+        worker = threading.Thread(target=observe)
+        worker.start(); assert ready.wait(2)
         runtime.close(); gc.collect()
+        worker.join(2)
+        assert observed == [True] and not worker.is_alive()
         assert handle.closed and weak() is None
         handle.close()
 

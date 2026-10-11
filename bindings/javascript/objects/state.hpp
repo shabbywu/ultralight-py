@@ -3,6 +3,7 @@
 #include "factory.hpp"
 #include <map>
 #include <algorithm>
+#include <atomic>
 namespace binding::objects {
 struct Document;
 struct Session;
@@ -14,7 +15,7 @@ struct Node {
 };
 struct Session : std::enable_shared_from_this<Session> {
     std::weak_ptr<Document> document;
-    bool closed = false;
+    std::atomic_bool closed = false;
     std::string name;
     std::map<std::string, std::shared_ptr<Node>> nodes;
     std::vector<std::shared_ptr<Ref>> cursors;
