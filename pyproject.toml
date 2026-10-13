@@ -47,7 +47,9 @@ test-command = "xvfb-run -a python -I scripts/test_wheel.py"
 
 [tool.cibuildwheel.windows]
 archs = ["AMD64"]
-repair-wheel-command = "delvewheel repair --analyze-existing -w {dest_dir} -v {wheel}"
+# Search the SDK DLLs already installed beside _native, and still analyze their
+# transitive dependencies so external runtime DLLs are repaired and bundled.
+repair-wheel-command = "delvewheel repair --ignore-existing --analyze-existing -w {dest_dir} -v {wheel}"
 
 [tool.cibuildwheel.macos]
 archs = ["arm64"]
