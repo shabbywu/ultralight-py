@@ -1,4 +1,6 @@
 import asyncio
+import math
+from itertools import pairwise
 from types import SimpleNamespace
 
 import pytest
@@ -43,13 +45,26 @@ async def test_host_controls_steps_and_immediate_results_do_not_drive():
     rt.close()
 
 
-async def test_auto_is_on_demand_shared_rate_limited_and_renders_only_when_needed():
+@pytest.mark.parametrize("clock_resolution", [None, 0.016])
+async def test_auto_is_on_demand_shared_rate_limited_and_renders_only_when_needed(
+    monkeypatch, clock_resolution
+):
+    if clock_resolution is not None:
+        # Reproduce early timer wakeups on Windows even on a high-resolution host.
+        loop = asyncio.get_running_loop()
+        time = loop.time
+        monkeypatch.setattr(loop, "_clock_resolution", clock_resolution)
+        monkeypatch.setattr(
+            loop, "time", lambda: math.floor(time() / clock_resolution) * clock_resolution
+        )
     rt = runtime()
     left, right = view(rt), view(rt)
     for page in (left, right):
         page.load_html("<body>")
+    updates = []
 
     def update():
+        updates.append(asyncio.get_running_loop().time())
         if rt._native.updates >= 3:
             for page in (left, right):
                 page._native.emit("dom_ready")
@@ -64,6 +79,7 @@ async def test_auto_is_on_demand_shared_rate_limited_and_renders_only_when_neede
         await asyncio.gather(driver.page(left).wait_ready(), driver.page(right).wait_ready())
         assert driver.loop.time() - start >= 0.018
         assert rt._native.updates == 3 and rt._native.renders == 0
+        assert all(later - earlier >= 0.01 for earlier, later in pairwise(updates))
         count = rt._native.updates
         await asyncio.sleep(0.025)
         assert rt._native.updates == count

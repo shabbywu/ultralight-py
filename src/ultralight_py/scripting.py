@@ -48,10 +48,19 @@ class ScriptDriver:
             nonlocal previous
             loop = asyncio.get_running_loop()
             await asyncio.sleep(max(0, previous + update_interval - loop.time()))
+            # asyncio timers can wake early on a coarse-resolution clock.
+            while (remaining := previous + update_interval - loop.time()) > 0:
+                await asyncio.sleep(remaining)
+            # Waiters may have finished while this step was rate limited.
+            active = [
+                render for operation, render in driver._demands.items() if not operation.done()
+            ]
+            if not active:
+                return
             previous = loop.time()
             runtime.update()
             runtime.refresh_display(display_id)
-            if render:
+            if any(active):
                 runtime.render()
 
         driver = cls(runtime, step=step)
