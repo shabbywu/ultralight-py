@@ -13,6 +13,9 @@ spec = importlib.util.spec_from_file_location("release", Path(__file__).parents[
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 VERSION = "0.3.0"
+PROJECT_VERSION = release.tomllib.loads((Path(__file__).parents[2] / "pyproject.toml").read_text())[
+    "project"
+]["version"]
 COMMIT = "a" * 40
 
 
@@ -111,10 +114,10 @@ def test_sdist_missing_dependency_blocks_release(tmp_path):
     [
         ("workflow_dispatch", "branch", "main", "false", True),
         ("workflow_dispatch", "branch", "main", "true", False),
-        ("workflow_dispatch", "tag", "v0.3.0", "true", True),
-        ("workflow_dispatch", "tag", "v0.4.0", "true", False),
-        ("release", "tag", "v0.3.0", "false", True),
-        ("release", "tag", "0.3.0", "false", False),
+        ("workflow_dispatch", "tag", f"v{PROJECT_VERSION}", "true", True),
+        ("workflow_dispatch", "tag", "v0.0.0", "true", False),
+        ("release", "tag", f"v{PROJECT_VERSION}", "false", True),
+        ("release", "tag", PROJECT_VERSION, "false", False),
     ],
 )
 def test_publish_gate(monkeypatch, tmp_path, event, ref_type, tag, publish, allowed):

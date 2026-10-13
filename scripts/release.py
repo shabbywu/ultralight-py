@@ -26,6 +26,11 @@ WHEEL_REQUIRED = {
     "ultralight_py/api.pyi",
     "ultralight_py/input.pyi",
     "ultralight_py/objects.pyi",
+    "ultralight_py/_waiting.py",
+    "ultralight_py/events.py",
+    "ultralight_py/events.pyi",
+    "ultralight_py/scripting.py",
+    "ultralight_py/scripting.pyi",
     "ultralight_py/integrations/asyncio.pyi",
     "ultralight_py/integrations/tkinter.pyi",
 }
@@ -34,6 +39,11 @@ SDIST_REQUIRED = {
     "CMakeLists.txt",
     "bindings/module.cpp",
     "src/ultralight_py/py.typed",
+    "src/ultralight_py/_waiting.py",
+    "src/ultralight_py/events.py",
+    "src/ultralight_py/events.pyi",
+    "src/ultralight_py/scripting.py",
+    "src/ultralight_py/scripting.pyi",
     "externals/pybind11/CMakeLists.txt",
     "externals/pybind11/include/pybind11/pybind11.h",
     "externals/ulbind17/CMakeLists.txt",
@@ -45,6 +55,9 @@ SDIST_REQUIRED = {
     "scripts/test_wheel.py",
     "tests/test_integration.py",
     "tests/cases.py",
+    "tests/__init__.py",
+    "tests/wait_fakes.py",
+    "tests/waiting_cases.py",
 }
 FORBIDDEN_PARTS = {
     ".git",
