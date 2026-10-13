@@ -13,3 +13,6 @@ __pycache__/
 
 # Ruff cache
 .ruff_cache/
+
+# Ultralight default Session storage (cookies, cache, and site data)
+/default/
