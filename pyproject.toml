@@ -16,7 +16,43 @@ dev = ["ruff==0.17.0"]
 
 [tool.scikit-build]
 wheel.packages = ["src/ultralight_py"]
-sdist.include = ["externals/pybind11/**", "externals/ulbind17/**"]
+# Explicit includes take precedence over excludes in scikit-build-core.
+# Negate cache/Git paths here too so submodule .git files cannot leak into sdist.
+sdist.include = [
+  "externals/pybind11/**", "externals/ulbind17/**", "scripts/**", "tests/**", "examples/**",
+  "!**/.git", "!**/.git/**", "!**/__pycache__/**", "!**/*.pyc",
+  "!**/build/**", "!**/sdk-cache/**", "!**/CMakeCache.txt", "!**/CMakeFiles/**",
+  "!**/.venv/**", "!**/.ruff_cache/**", "!**/.pytest_cache/**",
+]
+sdist.exclude = [
+  "**/.git", "**/.git/**", "**/__pycache__/**", "**/*.pyc",
+  "**/build/**", "**/sdk-cache/**", "**/CMakeCache.txt", "**/CMakeFiles/**",
+  "**/.venv/**", "**/.ruff_cache/**", "**/.pytest_cache/**",
+]
+
+[tool.cibuildwheel]
+build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
+skip = "pp* cp3??t-* *musllinux*"
+test-requires = ["pytest>=8,<10"]
+test-sources = ["tests", "examples", "scripts/test_wheel.py"]
+test-command = "python -I scripts/test_wheel.py"
+config-settings = { "cmake.define.ULTRALIGHT_SDK_VERSION" = "2.0.0-beta.2" }
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
+manylinux-x86_64-image = "manylinux_2_34"
+before-all = "dnf --disablerepo='epel*' install -y xorg-x11-server-Xvfb xorg-x11-xauth libX11 libXext libXrender libXt fontconfig freetype glib2 nss mesa-libGL alsa-lib"
+repair-wheel-command = "auditwheel repair --only-plat --plat manylinux_2_34_x86_64 -w {dest_dir} {wheel}"
+test-command = "xvfb-run -a python -I scripts/test_wheel.py"
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
+repair-wheel-command = "delvewheel repair --analyze-existing -w {dest_dir} -v {wheel}"
+
+[tool.cibuildwheel.macos]
+archs = ["arm64"]
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.3" }
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} --require-target-macos-version 11.3 -w {dest_dir} -v {wheel}"
 
 [tool.ruff]
 required-version = "==0.17.0"

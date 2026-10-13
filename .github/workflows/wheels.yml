@@ -1,0 +1,225 @@
+name: Wheels
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish this version tag to PyPI after environment approval
+        type: boolean
+        default: false
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    outputs:
+      name: ${{ steps.validate.outputs.name }}
+      version: ${{ steps.validate.outputs.version }}
+      commit: ${{ steps.validate.outputs.commit }}
+      publish: ${{ steps.validate.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install packaging 'pytest>=8,<10'
+      - name: Test release validation gates
+        run: python -m pytest scripts/tests -q
+      - name: Validate version and publication request
+        id: validate
+        env:
+          PUBLISH: ${{ inputs.publish || false }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: python scripts/release.py validate
+
+  build_sdist:
+    needs: validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install build twine packaging
+      - name: Build and validate standalone sdist
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          python -m build --sdist
+          python scripts/release.py sdist --version "$VERSION"
+          python -m twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+
+  build_wheels:
+    needs: [validate, build_sdist]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux-x64
+          - runner: windows-2022
+            platform: windows-x64
+          - runner: macos-14
+            platform: macos-arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install packaging
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: sdist
+      - name: Extract the validated sdist
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: python scripts/release.py sdist --directory sdist --version "$VERSION" --extract build-input
+      - run: python -m pip install cibuildwheel==4.3.1
+      - name: Build, repair and test installed wheels
+        working-directory: build-input/source
+        shell: bash
+        run: python -m cibuildwheel --output-dir ../../wheelhouse .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.platform }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+          retention-days: 30
+
+  assemble:
+    needs: [validate, build_sdist, build_wheels]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install twine packaging
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: collected
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: collected/sdist
+      - name: Collect packages without overwriting duplicate filenames
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          output = Path('dist')
+          output.mkdir()
+          for artifact in Path('collected').iterdir():
+              for package in artifact.iterdir():
+                  target = output / package.name
+                  if target.exists():
+                      raise SystemExit(f'Duplicate package filename: {package.name}')
+                  shutil.copyfile(package, target)
+          PY
+      - name: Validate the complete matrix and create SHA-256 manifest
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          COMMIT: ${{ needs.validate.outputs.commit }}
+        run: |
+          python scripts/release.py assemble --version "$VERSION" --commit "$COMMIT"
+          python -m twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        id: packages
+        with:
+          name: release-packages
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        id: manifest
+        with:
+          name: release-manifest
+          path: release-manifest/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Human verification instructions
+        env:
+          PACKAGES_URL: ${{ steps.packages.outputs.artifact-url }}
+          MANIFEST_URL: ${{ steps.manifest.outputs.artifact-url }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          COMMIT: ${{ needs.validate.outputs.commit }}
+          PUBLISH: ${{ needs.validate.outputs.publish }}
+        run: |
+          {
+            echo "## ultralight-py $VERSION"
+            echo "Source commit: $COMMIT; SDK: 2.0.0-beta.2; publish requested: $PUBLISH"
+            echo ""
+            echo "[Download release-packages]($PACKAGES_URL) · [Download SHA-256 manifest]($MANIFEST_URL)"
+            echo ""
+            echo "15 tested wheels and one standalone sdist; artifacts expire after 30 days."
+            echo "Download both artifacts, verify SHA-256, and install the matching wheel in a fresh environment."
+            echo "Follow README's installed-wheel test instructions on all three platforms before approving pypi."
+            echo "Approval publishes these exact files without rebuilding. Reject approval if verification fails."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish_pypi:
+    needs: [validate, assemble]
+    if: needs.validate.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install packaging
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-manifest
+          path: release-manifest
+      - name: Verify the approved files and provenance
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          COMMIT: ${{ needs.validate.outputs.commit }}
+        run: python scripts/release.py verify --version "$VERSION" --commit "$COMMIT"
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

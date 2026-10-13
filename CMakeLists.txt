@@ -20,3 +20,24 @@ install(TARGETS _native LIBRARY DESTINATION ultralight_py RUNTIME DESTINATION ul
 foreach(library IN ITEMS UltralightCore WebCore Ultralight)
   install(FILES "$<TARGET_FILE:Ultralight::${library}>" DESTINATION ultralight_py)
 endforeach()
+
+if(APPLE)
+  # SDK dylibs refer to their peers via @rpath without a usable package-local
+  # LC_RPATH. Make the installed copies self-contained, including for delocate's
+  # per-library dependency analysis, then restore their ad-hoc signatures.
+  install(CODE [[
+    set(_package "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/ultralight_py")
+    foreach(_library IN ITEMS UltralightCore WebCore Ultralight)
+      set(_file "${_package}/lib${_library}.dylib")
+      foreach(_dependency IN ITEMS UltralightCore WebCore Ultralight)
+        execute_process(
+          COMMAND /usr/bin/install_name_tool
+            -change "@rpath/lib${_dependency}.dylib"
+            "@loader_path/lib${_dependency}.dylib" "${_file}"
+          COMMAND_ERROR_IS_FATAL ANY)
+      endforeach()
+      execute_process(COMMAND /usr/bin/codesign --force --sign - "${_file}"
+        COMMAND_ERROR_IS_FATAL ANY)
+    endforeach()
+  ]])
+endif()

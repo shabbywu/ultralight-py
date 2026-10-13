@@ -7,6 +7,7 @@ import time
 import weakref
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from socketserver import TCPServer
 
 from ultralight_py import (
     ErrorCode,
@@ -366,9 +367,9 @@ def resource_errors():
     assert "resource failure" in str(errors[0])
     if sys.platform != "win32":
         blocked = Path.cwd() / "blocked"
-        blocked.mkdir()
-        (blocked / "page.html").write_text("<body>")
-        blocked.chmod(0)
+        # A symlink loop makes filesystem lookup fail even when tests run as
+        # root in manylinux containers; chmod(0) does not restrict root.
+        blocked.symlink_to(blocked.name, target_is_directory=True)
         errors.clear()
         failed.clear()
         try:
@@ -376,7 +377,7 @@ def resource_errors():
             pump(runtime, lambda: errors and failed)
             assert errors[0].code == ErrorCode.HostException
         finally:
-            blocked.chmod(0o700)
+            blocked.unlink()
     view.load_url("file:///slow.html")
 
     def unblock():
@@ -397,6 +398,14 @@ def resource_errors():
 
 
 def http():
+    class LoopbackServer(ThreadingHTTPServer):
+        def server_bind(self):
+            # HTTPServer normally performs reverse DNS during bind. This local
+            # fixture should not depend on the runner's DNS/network settings.
+            TCPServer.server_bind(self)
+            self.server_name = "localhost"
+            self.server_port = self.server_address[1]
+
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             data = b"<body><script>window.networkAnswer=123</script>"
@@ -409,7 +418,7 @@ def http():
         def log_message(self, *args):
             pass
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server = LoopbackServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
