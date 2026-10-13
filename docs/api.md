@@ -50,7 +50,7 @@
 | `close()`、`closed` | 幂等关闭；上下文退出也关闭 |
 
 对象成员、容器运算和转换规则见 [对象桥接](objects.md)。
-输入方法见 [README 输入事件](../README.md#输入事件)，继承的输入 API 同样属于公开 View 接口。
+输入方法见 [使用指南：输入事件](guide.md#输入事件)，继承的输入 API 同样属于公开 View 接口。
 `window_ready` 用于在页面脚本执行前安装绑定；`dom_ready` 用于等待 DOM 可用。
 FrameEvent 和 LoadFailure 是独立、只读的事件数据；console 参数为普通字典。
 事件可能来自子框架，主页面逻辑应检查 `is_main_frame`。
@@ -171,7 +171,7 @@ await page.wait_for_selector("#result")
 `Resource(data: bytes, mime_type=None, charset="utf-8")` 复制资源数据。
 mime_type 省略时存储为空字符串，加载时按文件扩展名推断；不是 Python None。
 `PixelBuffer` 是不可变数据类，字段为 width、height、row_bytes、format、dirty_bounds、data。
-format 的实际字符串为 `BGRA8Premultiplied`；数据格式和行偏移见 [README 像素](../README.md#像素)。
+format 的实际字符串为 `BGRA8Premultiplied`；数据格式和行偏移见 [使用指南：像素](guide.md#像素)。
 `undefined` 是单例；判断 JS undefined 使用 `value is undefined`，与 None/null 区分。
 
 UltralightError 继承 RuntimeError，JavaScriptError 继承 UltralightError。
@@ -191,7 +191,7 @@ ErrorCode 是原生枚举，支持名称属性 `.name`、数值 `.value` 和 `in
 
 Python 参数校验还可能直接抛 TypeError、ValueError、OverflowError。
 Python 桥接异常进入页面后为 JS Error；页面捕获后可以继续运行。
-事件与资源异常通过 Runtime 错误处理器报告，规则见 [README 页面事件与异常](../README.md#页面事件与异常)。
+事件与资源异常通过 Runtime 错误处理器报告，规则见 [使用指南：页面事件与异常](guide.md#页面事件与异常)。
 
 ## 线程与可选集成
 

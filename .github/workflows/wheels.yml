@@ -184,7 +184,7 @@ jobs:
             echo ""
             echo "15 tested wheels and one standalone sdist; artifacts expire after 30 days."
             echo "Download both artifacts, verify SHA-256, and install the matching wheel in a fresh environment."
-            echo "Follow README's installed-wheel test instructions on all three platforms before approving pypi."
+            echo "Follow docs/releasing.md's installed-wheel test instructions on all three platforms before approving pypi."
             echo "Approval publishes these exact files without rebuilding. Reject approval if verification fails."
           } >> "$GITHUB_STEP_SUMMARY"
 
