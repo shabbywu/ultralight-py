@@ -6,6 +6,7 @@ from ultralight_py.api import (
     JavaScriptError,
     JSValue,
     LoadFailure,
+    PageLoadError,
     PixelBuffer,
     Resource,
     Runtime,
@@ -13,6 +14,7 @@ from ultralight_py.api import (
     View,
     undefined,
 )
+from ultralight_py.events import Subscription
 from ultralight_py.input import (
     KeyCode,
     KeyEvent,
@@ -39,12 +41,14 @@ __all__ = [
     "MouseButton",
     "MouseEvent",
     "MouseEventType",
+    "PageLoadError",
     "PixelBuffer",
     "PythonBinding",
     "Resource",
     "Runtime",
     "ScrollEvent",
     "ScrollEventType",
+    "Subscription",
     "UltralightError",
     "View",
     "undefined",

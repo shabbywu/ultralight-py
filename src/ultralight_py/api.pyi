@@ -1,11 +1,14 @@
 from collections.abc import Callable, Sequence
 from os import PathLike
-from typing import Any, ClassVar, TypedDict
+from typing import Any, ClassVar, Literal, TypedDict, TypeVar, overload
 
 from typing_extensions import Self
 
+from ultralight_py.events import Subscription as Subscription
 from ultralight_py.input import InputView as _InputView
 from ultralight_py.objects import PythonBinding as PythonBinding
+
+_T = TypeVar("_T")
 
 class ErrorCode:
     InvalidArgument: ClassVar[ErrorCode]
@@ -68,6 +71,10 @@ class LoadFailure:
     @property
     def code(self) -> int: ...
 
+class PageLoadError(RuntimeError):
+    failure: LoadFailure
+    def __init__(self, failure: LoadFailure) -> None: ...
+
 class _ConsoleEvent(TypedDict):
     message: str
     source: int
@@ -122,6 +129,36 @@ class Runtime:
 class View(_InputView):
     @property
     def closed(self) -> bool: ...
+    @property
+    def is_ready(self) -> bool: ...
+    @property
+    def is_settled(self) -> bool: ...
+    @property
+    def navigation_id(self) -> int: ...
+    @property
+    def load_failure(self) -> LoadFailure | None: ...
+    @overload
+    def on(
+        self,
+        event: Literal["begin_loading", "window_ready", "dom_ready", "finish_loading"],
+        callback: Callable[[FrameEvent], Any],
+    ) -> Subscription: ...
+    @overload
+    def on(
+        self, event: Literal["fail_loading"], callback: Callable[[LoadFailure], Any]
+    ) -> Subscription: ...
+    @overload
+    def on(
+        self, event: Literal["console"], callback: Callable[[_ConsoleEvent], Any]
+    ) -> Subscription: ...
+    @overload
+    def on(
+        self, event: Literal["page_settled"], callback: Callable[[str], Any]
+    ) -> Subscription: ...
+    async def wait_ready(self, timeout: float = 5) -> None: ...
+    async def wait_settled(self, timeout: float = 5) -> None: ...
+    async def wait_until(self, predicate: Callable[[], _T], timeout: float = 5) -> _T: ...
+    async def wait_for_selector(self, selector: str, timeout: float = 5) -> bool: ...
     def load_html(self, html: str, url: str = "") -> None: ...
     def load_url(self, url: str) -> None: ...
     def resize(self, width: int, height: int) -> None: ...
@@ -134,6 +171,7 @@ class View(_InputView):
         finish_loading: Callable[[FrameEvent], Any] | None = None,
         fail_loading: Callable[[LoadFailure], Any] | None = None,
         console: Callable[[_ConsoleEvent], Any] | None = None,
+        page_settled: Callable[[str], Any] | None = None,
     ) -> None: ...
     async def evaluate_async(self, source: str) -> Any: ...
     def evaluate(self, source: str) -> Any: ...

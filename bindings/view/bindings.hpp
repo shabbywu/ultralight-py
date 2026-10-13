@@ -22,6 +22,10 @@ inline void register_view(py::module_ &module) {
           host.check(); py::gil_scoped_release release; host.view->Resize(width, height);
       })
       .def("set_callbacks", &HostView::callbacks)
+      .def("_check", [](HostView &host) { host.check(); })
+      .def_property_readonly("is_settled", [](HostView &host) {
+          host.check(); return host.view->native()->is_settled();
+      })
       .def("evaluate_handle", &HostView::evaluate)
       .def("bind_object", &HostView::bind_object)
       .def("unbind", &HostView::unbind)
