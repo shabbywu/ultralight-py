@@ -4,14 +4,14 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "ultralight-py"
-version = "0.3.0"
+version = "0.4.0"
 description = "Python bindings for Ultralight"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["typing-extensions==4.16.0"]
 
 [project.optional-dependencies]
-test = ["pytest>=8,<10"]
+test = ["pytest>=8,<10", "pytest-asyncio>=1,<2"]
 dev = ["ruff==0.17.0"]
 
 [tool.scikit-build]
@@ -33,7 +33,7 @@ sdist.exclude = [
 [tool.cibuildwheel]
 build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
 skip = "pp* cp3??t-* *musllinux*"
-test-requires = ["pytest>=8,<10"]
+test-requires = ["pytest>=8,<10", "pytest-asyncio>=1,<2"]
 test-sources = ["tests", "examples", "scripts/test_wheel.py"]
 test-command = "python -I scripts/test_wheel.py"
 config-settings = { "cmake.define.ULTRALIGHT_SDK_VERSION" = "2.0.0-beta.2" }
