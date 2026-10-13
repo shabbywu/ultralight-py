@@ -13,6 +13,7 @@ from ultralight_py.api import (
 from ultralight_py.api import (
     LoadFailure as LoadFailure,
 )
+from ultralight_py.api import PageLoadError as PageLoadError
 from ultralight_py.api import (
     PixelBuffer as PixelBuffer,
 )
@@ -31,6 +32,7 @@ from ultralight_py.api import (
 from ultralight_py.api import (
     undefined as undefined,
 )
+from ultralight_py.events import Subscription as Subscription
 from ultralight_py.input import (
     KeyCode as KeyCode,
 )

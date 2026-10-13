@@ -33,6 +33,14 @@ struct HostView : std::enable_shared_from_this<HostView> {
         callbacks.window_ready = frame_callback("window_ready");
         callbacks.dom_ready = frame_callback("dom_ready");
         callbacks.finish_loading = frame_callback("finish_loading");
+        if (values.contains("page_settled") && !values["page_settled"].is_none()) {
+            auto callback = reference(values["page_settled"]);
+            callbacks.page_settled = [callback](std::string_view url) {
+                py::gil_scoped_acquire gil;
+                try { callback->object()(py::str(url.data(), url.size())); }
+                catch (py::error_already_set &error) { throw Error(Code::HostException, error.what()); }
+            };
+        }
         if (values.contains("fail_loading") && !values["fail_loading"].is_none()) {
             auto callback = reference(values["fail_loading"]);
             callbacks.fail_loading = [callback](const auto &event) {

@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import atexit
+import traceback
+import weakref
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from typing_extensions import Self
 
-from ultralight_py import _asyncio, _native, _objects, _support
+from ultralight_py import _asyncio, _native, _objects, _support, _waiting
 from ultralight_py.input import InputView
 from ultralight_py.objects import PythonBinding
 
@@ -19,6 +21,7 @@ ErrorCode = _native.ErrorCode
 Resource = _native.Resource
 FrameEvent = _native.FrameEvent
 LoadFailure = _native.LoadFailure
+PageLoadError = _waiting.PageLoadError
 undefined = _native.undefined
 
 
@@ -77,6 +80,9 @@ class Runtime:
         self._assets_root = Path.cwd() if assets_root is None else Path(assets_root).resolve()
         self._resource_loader = resource_loader
         self._cache_path = resolved_cache
+        self._views = weakref.WeakSet()
+        self._updating = False
+        self._error_handler = _report
         self._native = _support.call(
             _native._Runtime.create,
             str(self._assets_root),
@@ -95,13 +101,22 @@ class Runtime:
         return View(
             _support.call(
                 self._native.create_view, _dimension(width), _dimension(height), transparent
-            )
+            ),
+            self,
         )
 
     def update(self) -> None:
         _support.ensure_in_main_thread()
-        _asyncio.flush(self)
-        _support.call(self._native.update)
+        if self._updating:
+            raise _native._make_error(ErrorCode.Busy, "Runtime.update cannot be re-entered")
+        self._updating = True
+        try:
+            _asyncio.flush(self)
+            _support.call(self._native.update)
+            for view in tuple(self._views):
+                view._state.notify(poll=True)
+        finally:
+            self._updating = False
 
     def refresh_display(self, display_id: int = 0) -> None:
         _support.call(self._native.refresh_display, display_id)
@@ -112,17 +127,34 @@ class Runtime:
     def set_error_handler(self, callback: Callable | None) -> None:
         _callable(callback, "callback")
         _support.call(self._native.set_error_handler, _report if callback is None else callback)
+        self._error_handler = _report if callback is None else callback
+
+    def _report_callback_error(self, error):
+        reported = _native._make_error(ErrorCode.HostException, str(error))
+        reported.stack = "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
+        try:
+            self._error_handler(reported)
+        except Exception as handler_error:  # noqa: BLE001 — isolate error-handler failures
+            _native._report_unraisable(handler_error)
 
     def close(self) -> None:
         try:
             _support.call(self._native.close)
         finally:
             if self.closed:
+                for view in tuple(self._views):
+                    view._state.close()
                 _asyncio.stop(self, _native._make_error(ErrorCode.Closed, "Runtime closed"))
                 driver = getattr(self, "_async_driver", None)
                 if driver is not None:
                     driver.close()
+                script_driver = getattr(self, "_script_driver", None)
+                if script_driver is not None:
+                    script_driver.close()
                 self._resource_loader = None
+                self._error_handler = _report
 
     def __enter__(self) -> Self:
         _support.ensure_in_main_thread()
@@ -137,18 +169,84 @@ class Runtime:
 class View(InputView):
     """An offscreen page. Use close() or a context manager for prompt release."""
 
-    def __init__(self, native):
+    def __init__(self, native, runtime=None):
         self._native = native
+        self._runtime = Runtime._instance if runtime is None else runtime
+        self._state = _waiting.PageState(self, self._runtime)
+        self._runtime._views.add(self)
+        state = weakref.ref(self._state)
+
+        def forward(name):
+            def emit(event):
+                current = state()
+                if current is not None:
+                    current.emit(name, event)
+
+            return emit
+
+        _support.call(native.set_callbacks, {name: forward(name) for name in _waiting.EVENTS})
 
     @property
     def closed(self) -> bool:
         return self._native.closed
 
     def load_html(self, html: str, url: str = "") -> None:
-        _support.call(self._native.load_html, html, url)
+        if not isinstance(html, str) or not isinstance(url, str):
+            raise TypeError("html and url must be strings")
+        self._load(self._native.load_html, html, url)
 
     def load_url(self, url: str) -> None:
-        _support.call(self._native.load_url, url)
+        if not isinstance(url, str):
+            raise TypeError("url must be a string")
+        self._load(self._native.load_url, url)
+
+    def _load(self, function, *args):
+        self._state.start_load()
+        try:
+            _support.call(function, *args)
+        except Exception as error:
+            for waiter in tuple(self._state.waiters):
+                if not waiter.future.done():
+                    waiter.future.set_exception(error)
+            raise
+
+    @property
+    def is_ready(self) -> bool:
+        self._state.check_open()
+        return self._state.ready
+
+    @property
+    def is_settled(self) -> bool:
+        self._state.check_open()
+        return self._state.settled and not self._state.pending_begin
+
+    @property
+    def navigation_id(self) -> int:
+        self._state.check_open()
+        return self._state.navigation_id
+
+    @property
+    def load_failure(self):
+        self._state.check_open()
+        return self._state.load_failure
+
+    def on(self, event, callback):
+        return self._state.subscribe(event, callback)
+
+    async def wait_ready(self, timeout=5) -> None:
+        await self._state.wait(lambda: self._state.ready, timeout, events=True)
+
+    async def wait_settled(self, timeout=5) -> None:
+        await self._state.wait(lambda: self._state.settled, timeout, events=True)
+
+    async def wait_until(self, predicate, timeout=5):
+        return await self._state.wait(predicate, timeout)
+
+    async def wait_for_selector(self, selector, timeout=5) -> bool:
+        expression = _waiting.selector_expression(selector)
+        return await self.wait_until(
+            lambda: self._state.ready and self.evaluate(expression), timeout
+        )
 
     def resize(self, width: int, height: int) -> None:
         _support.call(self._native.resize, _dimension(width), _dimension(height))
@@ -162,6 +260,7 @@ class View(InputView):
         finish_loading=None,
         fail_loading=None,
         console=None,
+        page_settled=None,
     ) -> None:
         callbacks = {
             "begin_loading": begin_loading,
@@ -170,10 +269,12 @@ class View(InputView):
             "finish_loading": finish_loading,
             "fail_loading": fail_loading,
             "console": console,
+            "page_settled": page_settled,
         }
         for name, callback in callbacks.items():
             _callable(callback, name)
-        _support.call(self._native.set_callbacks, callbacks)
+        self._state.check_open()
+        self._state.callbacks = callbacks
 
     def evaluate_handle(self, source: str) -> JSValue:
         return JSValue(_support.call(self._native.evaluate_handle, source))
@@ -221,7 +322,11 @@ class View(InputView):
         _support.call(self._native.clear_dirty_bounds)
 
     def close(self) -> None:
-        _support.call(self._native.close)
+        try:
+            _support.call(self._native.close)
+        finally:
+            if self.closed:
+                self._state.close()
 
     def __enter__(self) -> Self:
         _support.ensure_in_main_thread()
