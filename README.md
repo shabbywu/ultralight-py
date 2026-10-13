@@ -2,7 +2,7 @@
 
 Ultralight 2.x 的 Python 绑定，支持 CPU 离屏渲染、页面事件、Python/JavaScript
 双向函数调用、Python 实例与容器实时代理、文档级 JS 句柄、Python 虚拟资源加载，
-以及鼠标、滚动和键盘输入、Promise/asyncio 双向桥接。
+以及鼠标、滚动和键盘输入、Promise/asyncio 双向桥接、被动页面等待和可选脚本驱动。
 
 文档：[公开 API](docs/api.md) · [对象桥接](docs/objects.md) ·
 [架构与维护约定](docs/architecture.md) · [更新日志](CHANGELOG.md)。
@@ -32,29 +32,34 @@ pybind11 固定 v3.0.4，ulbind17 固定 `670910c`，默认 SDK 固定 2.0.0-bet
 ## 最小离屏闭环
 
 ```python
-import time
+import asyncio
 from ultralight_py import Runtime
+from ultralight_py.scripting import ScriptDriver
 
-with Runtime() as runtime:
+
+async def capture(runtime):
     with runtime.create_view(320, 180) as view:
-        ready = []
-        view.set_callbacks(
-            dom_ready=lambda event: ready.append(event) if event.is_main_frame else None,
-        )
-        view.load_html("<style>body{background:#ff0000}</style><body>Hello")
-        deadline = time.monotonic() + 5
-        while not ready:
-            if time.monotonic() >= deadline:
-                raise TimeoutError("Page did not become ready")
-            runtime.update()
-            runtime.refresh_display()
-            runtime.render()
-            time.sleep(0.005)
+        async with ScriptDriver.auto(runtime) as driver:
+            await driver.page(view).load_html(
+                "<style>body{background:#ff0000}</style><body>Hello",
+                wait_until="settled",
+                timeout=5,
+            )
         print(view.evaluate("document.body.textContent"))
         frame = view.copy_pixels()
         print(frame.width, frame.height, frame.row_bytes, frame.format)
         view.clear_dirty_bounds()
+
+
+with Runtime() as runtime:
+    asyncio.run(capture(runtime))
 ```
+
+已有宿主循环可直接使用 `await view.wait_ready()` / `wait_settled()`；它们不隐式推进引擎。
+需要脚本接口时使用 `ScriptDriver(runtime, step=host.request_step)`，由宿主决定推进时机。
+订阅与导航失效规则见 [页面等待与脚本驱动 API](docs/api.md#页面等待与事件订阅)。
+点击或提交触发页面替换时，用 `async with page.expect_navigation(...)` 在动作前登记等待；
+上下文退出后再等待新页面的选择器，动作与导航共用超时预算。
 
 完整示例包含加载错误处理：
 
@@ -92,6 +97,9 @@ python -m pytest tests -q
 | `begin_loading`、`window_ready`、`dom_ready`、`finish_loading` | `FrameEvent(frame_id, is_main_frame, url)` 的只读属性 |
 | `fail_loading` | `LoadFailure`：`frame`、`description`、`domain`、`code` |
 | `console` | 字典：`message`、`source`、`type`、`level`、`source_url`、`line`、`column` |
+| `page_settled` | 页面网络与布局静默后的 URL 字符串 |
+
+`view.on(event, callback)` 增加独立的可关闭订阅。`set_callbacks()` 不影响这些订阅或内部等待。
 
 事件数据拥有独立寿命，不引用 SDK 回调期间的借用对象。事件可能包含子框架，应检查
 `is_main_frame`。加载完成不保证加载成功，需要单独处理 `fail_loading`。
@@ -389,7 +397,7 @@ SDK 版本、文件大小、平台及 SHA-256。解压后，用 Python 3.11+ 和
 python -m pip install packaging
 python scripts/release.py verify --directory /path/to/release-packages \
   --manifest /path/to/release-manifest/manifest.json \
-  --version 0.3.0 --commit <运行摘要中的完整提交SHA>
+  --version 0.4.0 --commit <运行摘要中的完整提交SHA>
 ```
 
 在三种平台分别用匹配的 Python 创建全新虚拟环境，从 artifact 安装对应 wheel。
@@ -397,7 +405,7 @@ python scripts/release.py verify --directory /path/to/release-packages \
 另一个空目录（保持相对路径），进入该目录运行：
 
 ```sh
-python -m pip install /absolute/path/to/matching.whl 'pytest>=8,<10'
+python -m pip install /absolute/path/to/matching.whl 'pytest>=8,<10' 'pytest-asyncio>=1,<2'
 python -I scripts/test_wheel.py
 ```
 

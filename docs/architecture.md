@@ -18,6 +18,10 @@ Python 层提供公开 API、Python 语义和可选宿主集成。当前范围�
 `_asyncio.py` 管理循环关联、Promise 等待和延迟投递，`_validation.py` 提供输入校验，
 `_support.py` 提供主线程检查和原生调用封装。
 `integrations/asyncio.py` 保留公开的 Driver、install 和 run 接口。
+`_waiting.py` 管理页面代次、事件分发与被动等待，`events.py` 提供 Subscription；
+`scripting.py` 集中合并脚本推进需求，默认借用宿主回调，auto 工厂显式管理按需循环。
+Runtime.update 返回原生调用后才重检条件谓词；View 固定内部分发器通过弱引用接入原生回调，
+用户替换旧回调槽不会移除内部观察者。Runtime 使用弱集合通知 Python View 关闭和更新。
 私有模块中的辅助函数不使用下划线前缀；调用方只导入模块，使用
 `_support.call(...)`、`_asyncio.await_result(...)` 等形式访问。
 导入统一放在模块顶部并使用绝对路径。相互引用的模块先导入模块对象，
@@ -25,7 +29,7 @@ Python 层提供公开 API、Python 语义和可选宿主集成。当前范围�
 三者共用 `_support.py` 的主线程入口与 finally 清理，不让输入或绑定关闭反向依赖 api。
 `_objects.unwrap()` 通过 `_api.JSValue` 识别公共句柄；模块初始化时不读取尚未定义的类型。
 
-`api.pyi`、`input.pyi`、`objects.pyi` 分别描述对应模块，根 stub 只重新导出同一类型，
+`api.pyi`、`input.pyi`、`objects.pyi`、`events.pyi`、`scripting.pyi` 分别描述对应模块，根 stub 只重新导出同一类型，
 避免根入口与模块入口出现两个不同的静态类型。Tk 适配器拥有独立 stub。
 公开 callable 直接交给对象绑定，不再通过临时 Python 函数包装其身份。
 
@@ -76,3 +80,9 @@ Python 回调若捕获 View/Runtime，可形成跨语言引用环，应用应显
 异步桥接通过 `_asyncio.py` 管理循环关联、任务监听和延迟投递，
 原生 `async.hpp` 使用文档及绑定会话限制投递范围，并通过 SDK PostTask 回写。
 取消、解绑、导航、关闭及驱动器失败会撤销相关工作；asyncio/Tk 状态留在 Python 宿主层。
+
+页面状态统一保存在 PageState；原始事件继续分发，宿主读取 View 状态判断当前文档，
+避免重入导航后旧事件令应用缓存错误地恢复 ready。等待句柄同步登记，再异步等待结果；
+ScriptPage.expect_navigation 在动作前登记，共用动作和页面等待的截止时间。
+被动等待绑定当前文档，导航上下文绑定已观察到的加载请求；引擎跳转链可继续，
+后续显式加载会令其失效。两者都经同一个 ScriptDriver 请求宿主推进。
