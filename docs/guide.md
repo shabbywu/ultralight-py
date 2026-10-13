@@ -207,7 +207,38 @@ SDK 可从主线程和后台加载线程重复调用 loader。结果不缓存，
 格式固定为 **BGRA8、预乘 alpha**，行可能有填充；像素 `(x,y)` 的偏移为
 `y * row_bytes + x * 4`。`dirty_bounds` 为 `(left, top, right, bottom)`，右/下边界不包含在内。
 读取不会清除脏区域，成功消费后调用 `clear_dirty_bounds()`。
-RGBA/非预乘转换、图像编码、GPU View 和零复制映射不包含在首版中。
+
+`frame.to_rgba()` 返回拥有独立 bytes 的不可变 `RGBAImage`：`width`、`height`、`data`，
+以及只读 `format == "RGBA8"`、`row_bytes == width * 4`。输出从上到下排列，去除行填充，
+采用非预乘（straight）alpha；尺寸不变。`images.to_rgba(frame)` 是同一转换的函数入口，
+也接受 RGBAImage 并直接返回它。图像在 View/Runtime 关闭后仍可使用，转换可以放入宿主线程池，
+原生像素循环释放 GIL。
+
+```python
+from ultralight_py.images import to_numpy, to_pillow
+
+rgba = frame.to_rgba()  # 不要求 Pillow/NumPy
+image = to_pillow(rgba)  # pip install 'ultralight-py[pillow]'
+image.save("capture.png")  # Pillow 编码 PNG
+array = to_numpy(rgba)  # pip install 'ultralight-py[numpy]'
+readonly = to_numpy(rgba, copy=False)
+```
+
+Pillow 输出为独立、可修改的 RGBA 图像。NumPy 输出为 C 连续的 `(height, width, 4)` uint8 数组，
+默认可写且拥有独立数据；`copy=False` 返回 RGBA bytes 的只读视图，自动保持底层数据存活。
+它只省去数组复制：BGRA 去预乘转换仍需分配 RGBA bytes。先转换一次，再将同一 RGBAImage
+交给多个适配器，可以复用转换结果。基础导入和 RGBA 转换不会加载 Pillow/NumPy。
+
+去预乘采用 `min(255, channel * 255 // alpha)`，保留 alpha；alpha 为 0 时输出全零，
+为 255 时只交换通道。此转换沿用引擎的颜色空间；8 位预乘已经损失的信息无法精确恢复。
+转换忽略 padding 和尾部额外数据，输入长度至少为 `(height - 1) * row_bytes + width * 4`，
+允许末行没有尾部填充。尺寸要求正 uint32，stride 必须为正整数且至少为 `width * 4`；
+输入 data 必须为 bytes，格式必须为 `BGRA8Premultiplied`。
+无效类型抛 TypeError，无效值或短缓冲区抛 ValueError，大小溢出抛 OverflowError，分配失败抛 MemoryError。
+RGBAImage 构造器校验 data 长度恰好为 `width * height * 4`。
+
+缩放、背景合成、JPEG 编码、截图队列与传输由宿主应用负责。可运行
+[图像示例](../examples/images.py) 保存透明 PNG；性能测量见 `scripts/benchmark_images.py`。
 
 
 ## 输入事件

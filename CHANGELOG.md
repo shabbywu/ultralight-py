@@ -2,6 +2,8 @@
 
 ## 未发布
 
+- 增加独立 RGBAImage 与原生 BGRA/stride/去预乘转换；提供延迟加载的可选 Pillow/NumPy 输出，转换可在线程池中执行。
+
 - 增加多订阅事件与主框架页面状态；旧回调槽替换不影响内部等待和独立订阅。
 - 提供被动 `wait_ready/wait_settled/wait_until/wait_for_selector`、结构化 PageLoadError，处理导航、关闭、超时和取消。
 - 增加可选 ScriptDriver：宿主注入推进回调，或显式启用共享的按需循环；脚本导航跟随未完成的引擎导航链。

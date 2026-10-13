@@ -15,6 +15,7 @@ from ultralight_py.api import (
     undefined,
 )
 from ultralight_py.events import Subscription
+from ultralight_py.images import RGBAImage
 from ultralight_py.input import (
     KeyCode,
     KeyEvent,
@@ -44,6 +45,7 @@ __all__ = [
     "PageLoadError",
     "PixelBuffer",
     "PythonBinding",
+    "RGBAImage",
     "Resource",
     "Runtime",
     "ScrollEvent",

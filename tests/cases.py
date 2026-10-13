@@ -76,6 +76,15 @@ def pixels():
         assert len(frame.data) >= 80 * 60 * 4
         view.close()
     runtime.close()
+    rgba = frame.to_rgba()
+    assert (rgba.width, rgba.height, rgba.format) == (80, 60, "RGBA8")
+    assert rgba.data[30 * rgba.row_bytes + 40 * 4 : 30 * rgba.row_bytes + 40 * 4 + 4] == bytes(
+        [255, 0, 0, 255]
+    )
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        assert pool.submit(frame.to_rgba).result().data == rgba.data
     raises(UltralightError, lambda: Runtime(), ErrorCode.Closed)
 
 
@@ -87,6 +96,10 @@ def transparent():
         pixel = frame.data[frame.row_bytes * 10 + 40 : frame.row_bytes * 10 + 44]
         assert pixel[0] == pixel[1] == 0
         assert pixel[2] == pixel[3] and 120 <= pixel[3] <= 200, pixel
+        rgba = frame.to_rgba()
+        assert rgba.data[rgba.row_bytes * 10 + 40 : rgba.row_bytes * 10 + 44] == bytes(
+            [255, 0, 0, pixel[3]]
+        )
 
 
 def values():

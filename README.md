@@ -47,6 +47,7 @@ with Runtime() as runtime:
 
 引擎操作在 Python 主线程进行。上例由 `ScriptDriver.auto()` 推进页面；
 已有 GUI 或宿主循环时，也可以自行驱动 Runtime。像素格式为 BGRA8、预乘 alpha。
+`frame.to_rgba()` 返回独立的 RGBA 图像；可选 Pillow/NumPy 输出见 [像素指南](docs/guide.md#像素)。
 
 ## 文档与示例
 

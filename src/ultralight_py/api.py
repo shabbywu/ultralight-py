@@ -8,12 +8,16 @@ import weakref
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
 from ultralight_py import _asyncio, _native, _objects, _support, _waiting
 from ultralight_py.input import InputView
 from ultralight_py.objects import PythonBinding
+
+if TYPE_CHECKING:
+    from ultralight_py.images import RGBAImage
 
 UltralightError = _native.UltralightError
 JavaScriptError = _native.JavaScriptError
@@ -50,6 +54,12 @@ class PixelBuffer:
     format: str
     dirty_bounds: tuple[int, int, int, int]
     data: bytes
+
+    def to_rgba(self) -> RGBAImage:
+        """Return an owned, tightly packed image with straight RGBA alpha."""
+        from ultralight_py.images import to_rgba
+
+        return to_rgba(self)
 
 
 class Runtime:

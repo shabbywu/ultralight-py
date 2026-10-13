@@ -11,6 +11,8 @@ requires-python = ">=3.10"
 dependencies = ["typing-extensions==4.16.0"]
 
 [project.optional-dependencies]
+pillow = ["Pillow>=11,<13"]
+numpy = ["numpy>=1.26,<3"]
 test = ["pytest>=8,<10", "pytest-asyncio>=1,<2"]
 dev = ["ruff==0.17.0"]
 
@@ -33,7 +35,7 @@ sdist.exclude = [
 [tool.cibuildwheel]
 build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
 skip = "pp* cp3??t-* *musllinux*"
-test-requires = ["pytest>=8,<10", "pytest-asyncio>=1,<2"]
+test-requires = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "Pillow>=11,<13", "numpy>=1.26,<3"]
 test-sources = ["tests", "examples", "scripts/test_wheel.py"]
 test-command = "python -I scripts/test_wheel.py"
 config-settings = { "cmake.define.ULTRALIGHT_SDK_VERSION" = "2.0.0-beta.2" }

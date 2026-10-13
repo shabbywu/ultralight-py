@@ -5,6 +5,7 @@ from typing import Any, ClassVar, Literal, TypedDict, TypeVar, overload
 from typing_extensions import Self
 
 from ultralight_py.events import Subscription as Subscription
+from ultralight_py.images import RGBAImage
 from ultralight_py.input import InputView as _InputView
 from ultralight_py.objects import PythonBinding as PythonBinding
 
@@ -106,6 +107,7 @@ class PixelBuffer:
     def dirty_bounds(self) -> tuple[int, int, int, int]: ...
     @property
     def data(self) -> bytes: ...
+    def to_rgba(self) -> RGBAImage: ...
 
 class Runtime:
     def __new__(

@@ -1,3 +1,4 @@
+#include "images/bindings.hpp"
 #include "python/bindings.hpp"
 #include "resources/bindings.hpp"
 #include "runtime/bindings.hpp"
@@ -8,6 +9,7 @@
 
 PYBIND11_MODULE(_native, module) {
   module.doc() = "Python bindings for Ultralight.";
+  binding::register_images(module);
   binding::register_python(module);
   binding::register_resources(module);
   binding::register_runtime(module);

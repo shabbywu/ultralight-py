@@ -166,6 +166,23 @@ await page.wait_for_selector("#result")
 同一 Python callable 用 bind_function/bind_object 导出后，回传时恢复原 callable。
 不同显式绑定仍拥有独立的代理身份和撤销范围。
 
+## 图像输出
+
+`PixelBuffer.to_rgba()` 和 `ultralight_py.images.to_rgba(frame)` 返回 `RGBAImage`。
+RGBAImage 可从根包或 images 模块导入，构造为 `RGBAImage(width, height, data: bytes)`；
+不可变属性为 width、height、data、row_bytes（width * 4）、format（`"RGBA8"`）。
+像素为非预乘 RGBA，按行连续且没有填充。它独立于 Runtime/View，转换无需创建 Renderer。
+函数入口接受 PixelBuffer 或 RGBAImage，后者直接返回原对象。
+
+| `ultralight_py.images` 接口 | 输出 |
+|---|---|
+| `to_pillow(frame)` | 独立可修改的 Pillow RGBA Image；需要 `[pillow]` extra |
+| `to_numpy(frame, *, copy=True)` | 可写独立的 C 连续 uint8 数组，shape 为 `(height, width, 4)`；需要 `[numpy]` extra |
+| `to_numpy(frame, copy=False)` | 转换后 RGBA bytes 的只读视图，保持底层数据存活 |
+
+适配器接受 PixelBuffer 或 RGBAImage，依赖在调用时加载。缺依赖抛带安装提示的 ImportError。
+具体 stride、去预乘、校验和所有权规则见 [使用指南：像素](guide.md#像素)。
+
 ## 数据与错误
 
 `Resource(data: bytes, mime_type=None, charset="utf-8")` 复制资源数据。
