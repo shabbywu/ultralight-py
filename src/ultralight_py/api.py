@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import atexit
+import re
 import traceback
 import weakref
 from collections.abc import Callable, Sequence
@@ -62,6 +63,68 @@ class PixelBuffer:
         return to_rgba(self)
 
 
+def _session_name(name):
+    if not isinstance(name, str):
+        raise TypeError("Session name must be str")
+    reserved = {"default", "con", "prn", "aux", "nul", "clock$", "conin$", "conout$"}
+    reserved.update(f"{prefix}{number}" for prefix in ("com", "lpt") for number in range(1, 10))
+    if not re.fullmatch(r"[a-z0-9_-]{1,80}", name) or name in reserved:
+        raise ValueError("Invalid or reserved Session name")
+    return name
+
+
+def _bool(value, name):
+    if type(value) is not bool:
+        raise TypeError(f"{name} must be bool")
+    return value
+
+
+class Session:
+    """Browser storage shared by Views in one Runtime."""
+
+    def __init__(self, native, runtime, name, persistent):
+        self._native = native
+        self._runtime = runtime
+        self._name = name
+        self._persistent = persistent
+        self._disk_path = Path(native.disk_path).resolve() if persistent else None
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def persistent(self) -> bool:
+        return self._persistent
+
+    @property
+    def disk_path(self) -> Path | None:
+        return self._disk_path
+
+    @property
+    def closed(self) -> bool:
+        return self._native.closed
+
+    def close(self, *, force_close: bool = False) -> None:
+        _bool(force_close, "force_close")
+        try:
+            _support.call(self._native.close, force_close)
+        finally:
+            if self.closed:
+                for view in tuple(self._runtime._views):
+                    if view.session is self and view.closed:
+                        view._state.close()
+                if self._runtime._sessions.get(self.name) is self:
+                    del self._runtime._sessions[self.name]
+
+    def __enter__(self) -> Self:
+        _support.call(self._native.check)
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
+
 class Runtime:
     """One main-thread Renderer per process, shared until permanently closed."""
 
@@ -91,6 +154,7 @@ class Runtime:
         self._resource_loader = resource_loader
         self._cache_path = resolved_cache
         self._views = weakref.WeakSet()
+        self._sessions = {}
         self._updating = False
         self._error_handler = _report
         self._native = _support.call(
@@ -107,12 +171,53 @@ class Runtime:
     def closed(self) -> bool:
         return self._native.closed
 
-    def create_view(self, width: int, height: int, *, transparent: bool = False) -> View:
+    def create_session(self, name: str, *, persistent: bool = False) -> Session:
+        _session_name(name)
+        _bool(persistent, "persistent")
+        native = _support.call(self._native.create_session, name, persistent)
+        session = Session(native, self, name, persistent)
+        self._sessions[name] = session
+        return session
+
+    def get_session(self, name: str) -> Session | None:
+        _session_name(name)
+        _support.call(self._native.check)
+        return self._sessions.get(name)
+
+    def get_or_create_session(self, name: str, *, persistent: bool = False) -> Session:
+        _bool(persistent, "persistent")
+        session = self.get_session(name)
+        if session is not None:
+            if session.persistent != persistent:
+                raise ValueError("Session persistence is already configured")
+            return session
+        return self.create_session(name, persistent=persistent)
+
+    def create_view(
+        self,
+        width: int,
+        height: int,
+        *,
+        transparent: bool = False,
+        session: Session | None = None,
+    ) -> View:
+        if session is not None:
+            if not isinstance(session, Session):
+                raise TypeError("session must be Session or None")
+            if session._runtime is not self:
+                raise _native._make_error(
+                    ErrorCode.CrossContext, "Session belongs to another Runtime"
+                )
         return View(
             _support.call(
-                self._native.create_view, _dimension(width), _dimension(height), transparent
+                self._native.create_view,
+                _dimension(width),
+                _dimension(height),
+                transparent,
+                None if session is None else session._native,
             ),
             self,
+            session,
         )
 
     def update(self) -> None:
@@ -163,6 +268,7 @@ class Runtime:
                 script_driver = getattr(self, "_script_driver", None)
                 if script_driver is not None:
                     script_driver.close()
+                self._sessions.clear()
                 self._resource_loader = None
                 self._error_handler = _report
 
@@ -179,7 +285,8 @@ class Runtime:
 class View(InputView):
     """An offscreen page. Use close() or a context manager for prompt release."""
 
-    def __init__(self, native, runtime=None):
+    def __init__(self, native, runtime=None, session=None):
+        self._session = session
         self._native = native
         self._runtime = Runtime._instance if runtime is None else runtime
         self._state = _waiting.PageState(self, self._runtime)
@@ -199,6 +306,10 @@ class View(InputView):
     @property
     def closed(self) -> bool:
         return self._native.closed
+
+    @property
+    def session(self) -> Session | None:
+        return self._session
 
     def load_html(self, html: str, url: str = "") -> None:
         if not isinstance(html, str) or not isinstance(url, str):

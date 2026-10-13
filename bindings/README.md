@@ -5,7 +5,7 @@
 - `common.hpp`：共享类型别名、字符串及 GIL 工具。
 - `python/`：Python 引用延迟释放、异常转换和基础对象注册。
 - `resources/`：Python 资源回调、文件系统和资源类型注册。
-- `runtime/`：Runtime 创建、线程检查、错误处理及注册。
+- `runtime/`：Runtime/浏览器 HostSession 创建、线程检查、错误处理及注册。
 - `view/`：View 生命周期、页面事件、加载、像素访问及注册。
 - `images/`：独立 bytes 的 BGRA/stride/去预乘转换，不访问 Renderer，像素循环释放 GIL。
 - `input/`：通用鼠标、滚动、键盘和焦点转发，以及事件转换与 GIL 管理。

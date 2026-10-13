@@ -81,6 +81,7 @@ def runtime():
     result = object.__new__(Runtime)
     result._native = NativeRuntime()
     result._views = weakref.WeakSet()
+    result._sessions = {}
     result._updating = False
     result.errors = []
     result._error_handler = result.errors.append

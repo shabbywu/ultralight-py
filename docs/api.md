@@ -256,3 +256,45 @@ await 不隐式 update。自定义宿主可以自行调用 update，不必安装
 驱动器关闭或失败会终止关联的跨语言等待和投递；`run()` 传播驱动错误，
 退出时清理定时器、监听和任务。关闭驱动器后的 JS Promise 可能保持 pending。
 当前不提供 Tk/asyncio 联合循环或 JS AbortSignal。
+
+## Session
+
+`Runtime.create_session(name, *, persistent=False)` creates browser storage shared
+by Views in the same Session. `get_session(name)` returns the open object or `None`
+without scanning disk. `get_or_create_session(name, *, persistent=False)` reuses
+that object; a persistence mismatch raises `ValueError`. Creating an already open
+name also raises `ValueError`.
+
+Names must match `[a-z0-9_-]{1,80}`. `default` and Windows device names are reserved.
+Invalid names raise `ValueError`; incorrect argument types raise `TypeError`.
+`persistent` and `force_close` accept only bool values.
+
+Pass `session=session` to `Runtime.create_view`. `View.session` is read-only and
+cannot be switched after creation. Omitting it preserves the default SDK Session
+and returns `None` from `View.session`. A closed Session raises `Closed` when used
+for a new View; a Session owned by another Runtime raises `CrossContext`.
+
+Session exposes read-only `name`, `persistent`, `disk_path`, and `closed` properties.
+`disk_path` is an absolute `Path` reported by the SDK, or `None` for temporary
+storage. Persistent Sessions use named subdirectories of `Runtime(cache_path=...)`.
+Cookies with an explicit expiry, localStorage and IndexedDB survive normal process
+shutdown. The SDK has no explicit flush API. Session storage is isolated across
+Sessions, while sessionStorage remains independent per View.
+
+Runtime retains open Sessions and Views retain their Session. Closing all Views
+leaves their Session available for new Views. `session.close()` raises `Busy` while
+associated Views remain open. `session.close(force_close=True)` closes those Views,
+including page waits, subscriptions, JS handles and asynchronous bridges. Other
+Sessions' Views remain open. Closing is idempotent; metadata remains readable.
+Closing never deletes persistent data. Recreating a temporary Session with the
+same name starts empty; persistent Sessions reuse their disk directory.
+
+Session supports context management; exit calls ordinary `close()`, so Views must
+be closed first. Runtime shutdown closes Views, then explicit Sessions, then the
+Renderer. Session operations follow the same main-thread and resource-callback
+restrictions as Runtime and View. `force_close` only bypasses the View occupancy
+check. Browser storage isolation does not isolate Python code or host resources.
+
+See [the multi-Session example](../examples/sessions.py). Account configuration,
+login validity, task assignment, disk deletion, data import/export and concurrent
+cross-process access remain the application's responsibility.

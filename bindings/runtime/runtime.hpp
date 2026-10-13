@@ -3,10 +3,12 @@
 #include "../python/errors.hpp"
 namespace binding {
 struct HostView;
+struct HostSession;
 struct HostRuntime : std::enable_shared_from_this<HostRuntime> {
     std::optional<ulbind17::Runtime> runtime;
     std::shared_ptr<ResourceState> resources = std::make_shared<ResourceState>();
     std::vector<std::shared_ptr<HostView>> views;
+    std::vector<std::shared_ptr<HostSession>> sessions;
     Ref error_handler;
     const std::thread::id owner = std::this_thread::get_id();
     bool closed = false;
@@ -54,6 +56,20 @@ struct HostRuntime : std::enable_shared_from_this<HostRuntime> {
         for (auto &error : errors) report(error);
     }
     void close();
-    std::shared_ptr<HostView> create_view(uint32_t width, uint32_t height, bool transparent);
+    std::shared_ptr<HostView> create_view(uint32_t width, uint32_t height, bool transparent, std::shared_ptr<HostSession> session = nullptr);
+    std::shared_ptr<HostSession> create_session(std::string name, bool persistent);
+};
+struct HostSession : std::enable_shared_from_this<HostSession> {
+    std::weak_ptr<HostRuntime> runtime;
+    ultralight::RefPtr<ultralight::Session> session;
+    std::string name, disk_path;
+    bool persistent = false, closed = false;
+    void check() const {
+        auto host = runtime.lock();
+        if (!host) throw Error(Code::Closed, "Runtime is closed");
+        host->check();
+        if (closed) throw Error(Code::Closed, "Session is closed");
+    }
+    void close(bool force_close = false);
 };
 } // namespace binding

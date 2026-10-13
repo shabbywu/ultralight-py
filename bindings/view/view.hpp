@@ -3,11 +3,13 @@
 #include <optional>
 namespace binding {
 struct HostRuntime;
+struct HostSession;
 struct HostValue;
 namespace objects { struct Session; }
 struct HostView : std::enable_shared_from_this<HostView> {
     std::optional<ulbind17::ManagedView> view;
     std::weak_ptr<HostRuntime> runtime;
+    std::shared_ptr<HostSession> session;
     bool closed = false;
     void check(bool require_open = true) const;
     void close();

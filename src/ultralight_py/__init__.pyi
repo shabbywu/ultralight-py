@@ -23,6 +23,7 @@ from ultralight_py.api import (
 from ultralight_py.api import (
     Runtime as Runtime,
 )
+from ultralight_py.api import Session as Session
 from ultralight_py.api import (
     UltralightError as UltralightError,
 )

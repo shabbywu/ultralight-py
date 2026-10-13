@@ -12,7 +12,7 @@ Python 层提供公开 API、Python 语义和可选宿主集成。当前范围�
 
 ## Python 依赖
 
-`__init__.py` 和对应 stub 只汇总公开导出。`api.py` 提供 Runtime/View/JSValue；
+`__init__.py` 和对应 stub 只汇总公开导出。`api.py` 提供 Runtime/Session/View/JSValue；
 `input.py` 提供数据与输入 mixin；`objects.py` 提供 PythonBinding。
 共享的内部实现通过私有模块导入：`_objects.py` 提供原生代理的成员策略和运算，
 `_asyncio.py` 管理循环关联、Promise 等待和延迟投递，`_validation.py` 提供输入校验，
@@ -59,6 +59,13 @@ View/JSValue 的交叉操作位于 `view/javascript.hpp`。
 Runtime 强持有尚未关闭的原生 View 包装，View 弱引用 Runtime。
 关闭 View 时从 Runtime 列表移除，局部强引用保护执行中的关闭操作；Runtime 关闭先移出列表再逐一关闭。
 Python View 回收仅入队，避免在任意线程直接销毁 SDK 对象。
+
+浏览器存储使用 HostSession，区别于对象桥接的 objects::Session。
+Python Runtime 强持有打开的公共 Session，Python View 持有创建时指定的 Session；
+原生 Runtime 强持有打开的 HostSession，HostView 强持有 HostSession，HostSession 弱引用 Runtime。
+Session 普通关闭以原生 View 列表判断占用，强制关闭只关闭关联 View；释放 SDK Session 引用后移出注册表。
+Python 层同步清理已关闭 View 的等待和订阅，原生 View 关闭负责 JS 句柄和异步桥接失效。
+Runtime 关闭顺序为 View、显式 Session、Renderer。持久化目录由 SDK 管理，关闭不删除磁盘数据。
 
 每个有效文档通过 Bridge 的生命周期守卫持有 Document。
 Document 强持有隐式会话及命名会话，Session 持有 Node 和迭代器引用；反向关联均为弱引用。
