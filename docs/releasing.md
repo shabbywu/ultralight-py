@@ -1,69 +1,65 @@
 # 发布指南
 
-本文面向仓库维护者，记录多平台构建、发行包验收及 PyPI 发布步骤。
-本地构建见 [开发指南](development.md#构建与测试发行包)。
+本文记录发行包构建、验收和 PyPI 发布步骤。本地构建见 [开发指南](development.md#构建与测试发行包)。
 
-## 多平台 CI 与人工审批发布
+## 构建与触发
 
 [Wheels 工作流](../.github/workflows/wheels.yml) 构建普通 GIL CPython 3.10–3.14 的
-Windows x64、Linux x64、macOS ARM64 wheel，共 15 个 wheel 和一个 sdist。
-Linux 发行基线为 **glibc ≥ 2.34**；macOS 部署目标为 **11.3**（macOS 11.x 的 wheel
-标签统一为 `macosx_11_0_arm64`）。这些是 CI 的验收目标；一次运行只有所有构建、
-依赖修复及安装测试通过后，才会生成完整发行 artifact。
+Windows x64、Linux x64 和 macOS ARM64 安装包，共 15 个 wheel 和一个源码包。
+Linux 基线为 glibc 2.34，macOS 部署目标为 11.3，安装包标签为 `macosx_11_0_arm64`。
+原生扩展及 UltralightCore、WebCore、Ultralight、AppCore 动态库随包发行。
 
-在 GitHub Actions 选择 **Wheels → Run workflow**，选择分支并保持 `publish=false`，
-可进行试构建。分支上选择 `publish=true` 会在构建前失败。
-正式发布先让 `pyproject.toml` 和 `CMakeLists.txt` 的版本一致，创建对应的 `vX.Y.Z` tag，
-再发布该 tag 的 GitHub Release；也可选择该 tag 手动运行并勾选 `publish`。
-正式发布的 tag 必须与包版本完全匹配。仅创建 tag 不会自动发布。
-同一 ref 的运行不互相取消；GitHub 的 concurrency 仅保留一个运行和一个待运行项，
-更晚的触发可能替换待运行项，因此请避免连续重复触发。
+在 GitHub Actions 中手动运行 `Wheels`，保持 `publish=false` 可试构建分支。
+正式发布先统一 `pyproject.toml` 与 `CMakeLists.txt` 的版本，再创建对应的 `vX.Y.Z` 标签，
+发布该标签的 GitHub Release；也可手动选择标签并启用 `publish`。
+只有匹配包版本的标签允许发布，单独创建标签不会触发发布。
 
-工作流先构建并检查 sdist，再从该源码包构建 wheel，使用 auditwheel、delocate 和
-delvewheel 修复动态库依赖，逐个在独立环境安装 wheel 后运行现有测试。
-测试文件复制到临时目录，清除 `PYTHONPATH` 和 SDK 动态库搜索变量；
-核心原生用例必须执行，Tk 缺失时沿用现有跳过行为。源码提交和 SDK 版本固定，
-审批后直接上传本次构建的文件，不重新编译。
+工作流先校验源码包，再从源码包构建安装包。动态库依赖分别由 auditwheel、delocate 和
+delvewheel 修复，随后在独立环境安装并测试。源码提交和 SDK 版本固定；
+全部检查通过后生成发行产物，人工批准后上传这些文件，不重新编译。
 
-在运行摘要下载 `release-packages` 和 `release-manifest`，artifact 保留 30 天。
-前者仅含 wheel 与 sdist，后者包含 `manifest.json` 和 `SHA256SUMS`，记录提交 SHA、
-SDK 版本、文件大小、平台及 SHA-256。解压后，用 Python 3.11+ 和本次提交的校验脚本检查：
+## 下载与验收
+
+运行摘要提供 `release-packages` 和 `release-manifest`，保留 30 天。
+前者包含安装包和源码包；后者包含 `manifest.json`、`SHA256SUMS`，
+记录源提交、SDK 版本、文件大小、平台和校验和。
+
+使用 Python 3.11+ 校验完整发行包集合，将版本号和提交 SHA 替换为本次构建值：
 
 ```sh
 python -m pip install packaging
 python scripts/release.py verify --directory /path/to/release-packages \
   --manifest /path/to/release-manifest/manifest.json \
-  --version 0.4.0 --commit <运行摘要中的完整提交SHA>
+  --version 0.4.0 --commit 完整提交SHA
 ```
 
-在三种平台分别用匹配的 Python 创建全新虚拟环境，从 artifact 安装对应 wheel。
-下载并解压 sdist，将其中的 `tests/`、`examples/`、`scripts/test_wheel.py` 复制到
-另一个空目录（保持相对路径），进入该目录运行：
+在各目标平台创建全新虚拟环境并安装匹配的安装包。将源码包中的 `tests/`、`examples/`
+和 `scripts/test_wheel.py` 复制到另一个空目录，保持相对路径，在该目录运行：
 
 ```sh
-python -m pip install /absolute/path/to/matching.whl 'pytest>=8,<10' 'pytest-asyncio>=1,<2'
+python -m pip install /absolute/path/to/matching.whl \
+  'pytest>=8,<10' 'pytest-asyncio>=1,<2' 'Pillow>=11,<13' 'numpy>=1.26,<3'
 python -I scripts/test_wheel.py
 ```
 
-无需提供外部 Ultralight SDK。Linux 测试环境需要 Xvfb、X11、字体及相关系统运行库，
-使用 `xvfb-run -a python -I scripts/test_wheel.py`；CI 使用的安装列表见
-`pyproject.toml` 的 `tool.cibuildwheel.linux.before-all`。
-人工确认像素、透明度、资源、HTTP、输入、对象 Bridge、asyncio、缓存及释放测试结果后，
-在本次运行的 **Review deployments → pypi** 审批。拒绝审批不会上传；
-批准后会再次核对整套文件与清单，仅上传这些文件。已存在的 PyPI 版本会发布失败，
-不会跳过重复文件。超过 artifact 保留期须重新构建并验证。
+验收使用包内 SDK 运行库，不提供外部 SDK。Linux 需要 Xvfb、X11、字体及相关系统库，
+使用 `xvfb-run -a python -I scripts/test_wheel.py`；依赖列表见 `pyproject.toml`。
+Tk 与 AppCore 原生窗口用例需要相应桌面环境，AppCore 桌面测试目前以 macOS 为验收目标。
+另外运行 [窗口示例](../examples/appcore.py)，检查中文字体、输入法、尺寸调整和跨屏 DPI。
 
-仓库维护者需要完成以下外部配置（工作流文件无法代替这些设置）：
+## 审核与发布
 
-- GitHub **Settings → Environments → pypi**：Required reviewers 设置为 `shabbywu`，
-  允许维护者自行审批（关闭 Prevent self-review），关闭管理员绕过保护规则，
-  Deployment branches and tags 选择仅允许 **Tag** 类型的 `v*`。
-  Required reviewers 的可用性取决于仓库可见性和 GitHub 方案；必须确认审批规则已实际启用。
-  仅写 `environment: pypi` 不会自动启用人工审批，见
-  [GitHub Environment 官方说明](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)。
-- PyPI 为 `ultralight-py` 配置 Trusted Publisher：Owner `shabbywu`，Repository `ultralight-py`，
-  Workflow `wheels.yml`，Environment `pypi`。使用 OIDC，无需保存 PyPI API Token，见
-  [PyPI Trusted Publisher 官方说明](https://docs.pypi.org/trusted-publishers/using-a-publisher/)。
+确认安装、资源、像素、输入、对象桥接、Session、asyncio 与释放测试结果后，
+在本次运行的部署审核页面批准 `pypi`。批准后再次校验文件和清单，并上传到 PyPI。
+拒绝审核不会上传；同版本已存在时发布失败。产物过期后需要重新构建和验收。
 
-仅 `publish_pypi` job 有 `id-token: write` 权限；其他 job 仅有 `contents: read`。
-本工作流不添加 PR 全矩阵构建、TestPyPI 或 GitHub Release 附件上传。
+维护者需完成仓库外部配置：
+
+- GitHub 中配置受保护的 `pypi` 环境：审核者设为 `shabbywu`，允许自行审核，
+  禁止管理员绕过，仅允许 `v*` 标签部署。保护规则需在 GitHub 实际启用，
+  工作流中的环境名称不会自动创建审核规则。参见 [环境保护说明](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)。
+- PyPI 中为 `ultralight-py` 配置可信发布者：所有者 `shabbywu`、仓库 `ultralight-py`、
+  工作流 `wheels.yml`、环境 `pypi`。通过 OIDC 发布，无需保存 API 令牌。
+  参见 [可信发布者配置](https://docs.pypi.org/trusted-publishers/using-a-publisher/)。
+
+仅发布作业持有 `id-token: write`，其他作业只持有 `contents: read`。

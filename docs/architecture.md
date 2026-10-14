@@ -1,7 +1,7 @@
 # 架构与维护约定
 
 项目采用三层实现：ulbind17 提供跨语言宿主能力，原生绑定管理 Python/JSC 边界，
-Python 层提供公开 API、Python 语义和可选宿主集成。当前范围包含 CPU 离屏渲染和同步、异步双向桥接。
+Python 层提供公开 API、Python 语义和可选宿主集成。支持 CPU 离屏渲染、AppCore 原生窗口，以及同步和异步双向桥接。
 
 | 层 | 职责与边界 |
 | --- | --- |
@@ -12,32 +12,35 @@ Python 层提供公开 API、Python 语义和可选宿主集成。当前范围�
 
 ## Python 依赖
 
-`__init__.py` 和对应 stub 只汇总公开导出。`api.py` 提供 Runtime/Session/View/JSValue；
-`input.py` 提供数据与输入 mixin；`objects.py` 提供 PythonBinding。
+`__init__.py` 和对应类型声明 只汇总公开导出。`api.py` 提供 Runtime/Session/View/JSValue；
+`input.py` 提供数据与输入混入类；`objects.py` 提供 PythonBinding；
+`appcore.py` 提供 Application/Window，`registry.py` 提供独立 API 注册表。
 共享的内部实现通过私有模块导入：`_objects.py` 提供原生代理的成员策略和运算，
 `_asyncio.py` 管理循环关联、Promise 等待和延迟投递，`_validation.py` 提供输入校验，
 `_support.py` 提供主线程检查和原生调用封装。
 `integrations/asyncio.py` 保留公开的 Driver、install 和 run 接口。
 `_waiting.py` 管理页面代次、事件分发与被动等待，`events.py` 提供 Subscription；
-`scripting.py` 集中合并脚本推进需求，默认借用宿主回调，auto 工厂显式管理按需循环。
-Runtime.update 返回原生调用后才重检条件谓词；View 固定内部分发器通过弱引用接入原生回调，
+`scripting.py` 集中合并脚本推进需求，默认借用宿主回调，`auto()` 工厂显式管理按需循环。
+Runtime 更新或 AppCore 步进返回原生调用后才重检条件谓词；View 固定内部分发器通过弱引用接入原生回调，
 用户替换旧回调槽不会移除内部观察者。Runtime 使用弱集合通知 Python View 关闭和更新。
 私有模块中的辅助函数不使用下划线前缀；调用方只导入模块，使用
 `_support.call(...)`、`_asyncio.await_result(...)` 等形式访问。
 导入统一放在模块顶部并使用绝对路径。相互引用的模块先导入模块对象，
 在函数运行时访问类型属性，避免初始化期间读取尚未定义的类型。
-三者共用 `_support.py` 的主线程入口与 finally 清理，不让输入或绑定关闭反向依赖 api。
+原生调用共用 `_support.py` 的主线程入口与清理机制，输入与绑定关闭不反向依赖公开 api 模块。
 `_objects.unwrap()` 通过 `_api.JSValue` 识别公共句柄；模块初始化时不读取尚未定义的类型。
 
-`api.pyi`、`input.pyi`、`objects.pyi`、`events.pyi`、`scripting.pyi` 分别描述对应模块，根 stub 只重新导出同一类型，
-避免根入口与模块入口出现两个不同的静态类型。Tk 适配器拥有独立 stub。
-公开 callable 直接交给对象绑定，不再通过临时 Python 函数包装其身份。
+`api.pyi`、`input.pyi`、`objects.pyi`、`events.pyi`、`scripting.pyi` 分别描述对应模块，根类型声明 只重新导出同一类型，
+避免根入口与模块入口出现两个不同的静态类型。Tk 适配器拥有独立类型声明。
+公开可调用对象 直接交给对象绑定，不再通过临时 Python 函数包装其身份。
 
 ## 原生模块
 
-保持 header-only，`module.cpp` 只负责注册顺序。模块按职责组织目录，不拆出多份 cpp。
+保持 仅头文件实现，`module.cpp` 只负责注册顺序。模块按职责组织目录，不拆出多份 cpp。
 Runtime/View 互相引用时使用前置声明，需完整类型的所有权操作汇集在 `runtime/views.hpp`。
-View/JSValue 的交叉操作位于 `view/javascript.hpp`。
+View/JSValue 的交叉操作位于 `view/javascript.hpp`，像素输出位于 `view/pixels.hpp`。
+AppCore 的应用、窗口和注册入口分别位于 `appcore/application.hpp`、`window.hpp`、`bindings.hpp`。
+图像转换在 `images/conversion.hpp`，注册入口在 `images/bindings.hpp`。
 
 对象桥接目录划分如下：
 
@@ -45,14 +48,14 @@ View/JSValue 的交叉操作位于 `view/javascript.hpp`。
 | --- | --- |
 | `state.hpp` | Document、Session、Node 的持有关系、查找与撤销 |
 | `factory.hpp` | JS Proxy 工厂及保留的 Python 命名空间 |
-| `proxy.hpp` | 成员回调、callable 调用与会话内身份转换 |
+| `proxy.hpp` | 成员回调、可调用对象调用与会话内身份转换 |
 | `iteration.hpp` | Python 迭代器适配及完成/提前退出后的引用释放 |
 | `operators.hpp` | JS Python 运算入口、绑定范围选择与异常转换 |
 | `document.hpp` | 文档初始化、生命周期守卫与通用转换入口接线 |
-| `async.hpp` | Python awaitable 的 JS Promise、会话撤销与 SDK PostTask 投递 |
+| `async.hpp` | Python 可等待对象 的 JS Promise、会话撤销与 SDK PostTask 投递 |
 
 `conversion.hpp` 保留基础按值转换，循环和深度限制复用 ulbind17 Traversal。
-公共 Python bind_function 提供 callable 校验，原生层统一使用 bind_object 绑定。
+公共 Python `bind_function()` 校验对象是否可调用，原生层统一使用 bind_object 绑定。
 
 ## 所有权和清理
 
@@ -69,17 +72,17 @@ Runtime 关闭顺序为 View、显式 Session、Renderer。持久化目录由 SD
 
 每个有效文档通过 Bridge 的生命周期守卫持有 Document。
 Document 强持有隐式会话及命名会话，Session 持有 Node 和迭代器引用；反向关联均为弱引用。
-JS payload 不持有 Python 强引用，文档失效清除守卫，先撤销会话再释放对象。
+JS 代理载荷 不持有 Python 强引用，文档失效清除守卫，先撤销会话再释放对象。
 文档注册表只保存弱引用，Document 销毁时删除对应记录，防止长期导航积累过期条目。
 注册表访问与守卫撤销都在文档所属线程进行；其他线程只可查询原子绑定关闭状态。
 
-所有 Python 强引用封装在 PythonRef 中。析构只向队列提交 PyObject，
-主线程持有 GIL 时 drain；JSC GC/finalizer 中不获取 GIL。
+原生层的 Python 强引用封装在 PythonRef 中。析构只向队列提交 PyObject，
+主线程持有 GIL 时 drain；JSC 垃圾回收或终结器 中不获取 GIL。
 会话按对象身份保留代理直到撤销或文档失效，不依赖 JS GC 推断 Python 对象是否还可被访问。
 没有被消费完或提前 return 的迭代器也保留到会话失效。
 Python 回调若捕获 View/Runtime，可形成跨语言引用环，应用应显式 close。
 
-动态注册入口、JS 工厂回调以及解释器退出钩子即使没有静态调用边，也不能作为 dead code 删除。
+动态注册入口、JS 工厂回调以及解释器退出钩子即使没有静态调用边，也不能作为无用代码删除。
 内嵌字体、SDK 资源覆盖层与固定版本下载继续复用 ulbind17，未另建通用运行时实现。
 
 ## 异步桥接
@@ -89,7 +92,26 @@ Python 回调若捕获 View/Runtime，可形成跨语言引用环，应用应显
 取消、解绑、导航、关闭及驱动器失败会撤销相关工作；asyncio/Tk 状态留在 Python 宿主层。
 
 页面状态统一保存在 PageState；原始事件继续分发，宿主读取 View 状态判断当前文档，
-避免重入导航后旧事件令应用缓存错误地恢复 ready。等待句柄同步登记，再异步等待结果；
+避免重入导航后旧事件令应用缓存错误地恢复为就绪状态。等待句柄同步登记，再异步等待结果；
 ScriptPage.expect_navigation 在动作前登记，共用动作和页面等待的截止时间。
 被动等待绑定当前文档，导航上下文绑定已观察到的加载请求；引擎跳转链可继续，
 后续显式加载会令其失效。两者都经同一个 ScriptDriver 请求宿主推进。
+
+## AppCore 与持久注册表
+
+`appcore.py` 提供 Application/Window 与持续 asyncio 驱动，`registry.py` 提供独立 API。
+原生 `bindings/appcore/` 通过 ulbind17 Application 接入现有 HostRuntime，窗口采用
+ManagedView/AdoptPanel；AppCore 平台初始化保留 Python FileSystemOverlay，使用系统字体。
+窗口 View 使用窗口默认配置，离屏 View 仍为 CPU。AppCore 独占 Renderer 驱动。
+
+独立注册表的 `registry/api.hpp` 持有 Python 注册定义；`attachments.hpp` 负责附着、重放与撤销，
+`bindings.hpp` 负责注册 Python 接口。View 的 `window_ready` 内部回调通过原有动态 Bridge
+创建命名空间和文档会话。它与 SDK 类型化 js::API 分工，
+不将动态 Python 对象替换为 C++ 类注册。每个注册项按 View/文档隔离，导航只重建文档会话。
+View 强持有附着注册表，注册表弱引用 View；文档只保留会话，旧会话失效立即撤销代理和投递。
+关闭最后一个 View 不清空定义，API.close 才释放全部注册引用。
+
+HostView 的独立关闭通知同步 Python PageState，覆盖显式 View 关闭、Session 强制关闭及
+AppCore 原生窗口关闭。窗口关闭先清理文档和等待，再分发用户关闭事件；最后一个窗口关闭
+应用和 Runtime。run_async 完成、取消或失败时执行同一关闭路径，并给 asyncio 取消回调执行机会。
+ScriptDriver(app.runtime) 仅等待应用帧通知，窗口驱动不随脚本需求停止。

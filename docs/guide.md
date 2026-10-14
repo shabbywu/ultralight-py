@@ -3,6 +3,8 @@
 页面加载、双向桥接、资源、像素与输入的使用约定。接口签名见 [公开 API](api.md)，
 对象代理语义见 [对象桥接](objects.md)。
 
+AppCore 原生窗口、系统字体、IME 和独立 API 注册表见 [窗口指南](appcore.md)。
+
 ## 最小离屏闭环
 
 ```python
@@ -53,8 +55,9 @@ python -m pytest tests -q
   显式目录解析为绝对路径；默认 `None` 保留 SDK 默认配置，后续省略会复用首次配置。
   后续传入不同的目录或 loader 会报错。`Runtime.close()` 关闭全部 View，关闭后不能重建
   Renderer；日常复用 Runtime，反复创建和关闭 View。上下文管理器退出会执行关闭。
-- Runtime、View、JSValue 的操作和显式关闭只能在 Python 主线程进行。运行时不启动宿主循环；
-  必须自行调用 `update()`、`refresh_display()` 和 `render()`。`update()` 也推进句柄及回调清理。
+- Runtime、View、JSValue 的操作和显式关闭只能在 Python 主线程进行。离屏 Runtime 不启动宿主循环；
+  宿主自行调用 `update()`、`refresh_display()` 和 `render()`。`update()` 也推进句柄及回调清理。
+  AppCore 窗口由 Application 持续驱动，不能再手动更新其 Runtime。
 - View 的垃圾回收只将关闭任务入队，在后续主线程调用中处理。使用 `close()` 或 `with`
   获得及时释放；`atexit` 会在解释器退出前关闭 Runtime。回调捕获 View/Runtime 时可能形成
   Python 与原生对象之间的引用环，显式关闭会解除回调引用。
@@ -111,13 +114,13 @@ with view.evaluate_handle("({offset:10, add(n){return this.offset+n}})") as obj:
             assert result.to_python() == 22
 ```
 
-函数只绑定当前文档，不自动跨导航重放。在每次主框架 `window_ready` 中显式重绑；
-向页面注册函数意味着允许该页面调用 Python，请由应用选择注册的文档。
+上述 `View.bind_function()` 只绑定当前文档，不自动跨导航重放。在每次主框架 `window_ready` 中显式重绑；
+需要加载前附着和跨导航恢复时，使用 [独立 API 注册表](appcore.md#注册与恢复)。
 
 `evaluate()` 返回 Python 值；`evaluate_handle()` 返回 JSValue。句柄支持
 `get(str_or_int)`、`set(key, value)`、`keys()`、`call(*args, this=None)` 和 `to_python()`。
-`get()` 和 `call()` 返回句柄，显式指定 `this` 可保留方法的 receiver。
-`set()`/`call()` 的单个值以及 Python callable 的返回值可以是同文档 JSValue。
+`get()` 和 `call()` 返回句柄，显式指定 `this` 可保留方法的接收对象。
+`set()`/`call()` 的单个值以及 Python 可调用对象的返回值可以是同文档 JSValue。
 实时 Python 容器中的 JSValue 也会在访问时检查所属文档；显式按值复制不转换 JSValue。
 
 | Python | JavaScript |
@@ -163,7 +166,8 @@ left_binding.close()
 
 自动暴露公开属性、property 和方法；可通过 `members=[...]` 收窄根对象成员。
 同类实例的方法与状态分别管理，每个绑定内部保持对象身份，解除绑定使已导出的嵌套代理和方法失效。
-主框架导航后重新绑定；View 持有 PythonBinding，丢弃句柄不会解除绑定。
+文档级绑定需在主框架导航后重新创建；独立 API 注册表自动恢复。
+View 保留 PythonBinding 会话，丢弃句柄不会解除绑定。
 
 Python list/dict/tuple 统一使用实时代理，
 包括函数返回值和 JSValue 的参数。JS 使用 Python 的 `append`、`get` 等方法，
@@ -189,11 +193,11 @@ view.load_url("file:///page.html")
 加载顺序为内嵌 ICU/证书、Python loader、本地文件系统。SDK 资源不交给 Python loader。
 `assets_root=None` 使用首次初始化时的工作目录，显式目录解析为绝对路径。
 `load_html(html, url="")` 的 URL 可为相对资源提供页面基址；`load_url()` 也支持 HTTP/HTTPS URL。
-默认字体来自 ulbind17 内嵌字体，不自动发现系统字体。
+离屏 Runtime 默认使用 ulbind17 内嵌字体；Application 使用 AppCore 系统字体。
 
 `resource_loader(path)` 返回 `bytes`、`Resource(data, mime_type=None, charset="utf-8")`
 或 `None`。只有 `None` 触发本地目录回退；异常或错误返回类型导致该资源读取失败。
-未指定 MIME 时按扩展名推断，编码默认 UTF-8；SDK Buffer 拥有内容副本，包括空 bytes。
+未指定 MIME 时按扩展名推断，编码默认 UTF-8；SDK 缓冲区拥有内容副本，包括空字节串。
 
 SDK 可从主线程和后台加载线程重复调用 loader。结果不缓存，回调应在同一次加载中返回一致内容，
 共享状态需要自行同步。loader 内禁止操作 Runtime/View/JS，也不要等待主线程驱动页面。
@@ -210,7 +214,7 @@ SDK 可从主线程和后台加载线程重复调用 loader。结果不缓存，
 
 `frame.to_rgba()` 返回拥有独立 bytes 的不可变 `RGBAImage`：`width`、`height`、`data`，
 以及只读 `format == "RGBA8"`、`row_bytes == width * 4`。输出从上到下排列，去除行填充，
-采用非预乘（straight）alpha；尺寸不变。`images.to_rgba(frame)` 是同一转换的函数入口，
+采用非预乘透明度；尺寸不变。`images.to_rgba(frame)` 是同一转换的函数入口，
 也接受 RGBAImage 并直接返回它。图像在 View/Runtime 关闭后仍可使用，转换可以放入宿主线程池，
 原生像素循环释放 GIL。
 
@@ -224,15 +228,15 @@ array = to_numpy(rgba)  # pip install 'ultralight-py[numpy]'
 readonly = to_numpy(rgba, copy=False)
 ```
 
-Pillow 输出为独立、可修改的 RGBA 图像。NumPy 输出为 C 连续的 `(height, width, 4)` uint8 数组，
+Pillow 输出为独立、可修改的 RGBA 图像。NumPy 输出为 C 顺序的连续 `(height, width, 4)` uint8 数组，
 默认可写且拥有独立数据；`copy=False` 返回 RGBA bytes 的只读视图，自动保持底层数据存活。
 它只省去数组复制：BGRA 去预乘转换仍需分配 RGBA bytes。先转换一次，再将同一 RGBAImage
 交给多个适配器，可以复用转换结果。基础导入和 RGBA 转换不会加载 Pillow/NumPy。
 
 去预乘采用 `min(255, channel * 255 // alpha)`，保留 alpha；alpha 为 0 时输出全零，
 为 255 时只交换通道。此转换沿用引擎的颜色空间；8 位预乘已经损失的信息无法精确恢复。
-转换忽略 padding 和尾部额外数据，输入长度至少为 `(height - 1) * row_bytes + width * 4`，
-允许末行没有尾部填充。尺寸要求正 uint32，stride 必须为正整数且至少为 `width * 4`；
+转换忽略行尾填充和尾部额外数据，输入长度至少为 `(height - 1) * row_bytes + width * 4`，
+允许末行没有尾部填充。尺寸要求正 uint32，行跨度必须为正整数且至少为 `width * 4`；
 输入 data 必须为 bytes，格式必须为 `BGRA8Premultiplied`。
 无效类型抛 TypeError，无效值或短缓冲区抛 ValueError，大小溢出抛 OverflowError，分配失败抛 MemoryError。
 RGBAImage 构造器校验 data 长度恰好为 `width * height * 4`。
@@ -250,7 +254,7 @@ from ultralight_py import KeyCode, Modifiers, MouseButton
 
 view.focus()
 view.click(40, 80, button=MouseButton.LEFT)
-view.input_text("Hello，世界 😀")
+view.input_text("你好，世界 😀")
 view.key_down(KeyCode.GK_BACK)
 view.key_up(KeyCode.GK_BACK)
 view.scroll(delta_y=-120, x=200, y=200)
@@ -270,7 +274,7 @@ view.scroll(delta_y=-120, x=200, y=200)
 
 `key_down()` 发送 RAW_KEY_DOWN，不自动输入文本；`key_up()` 发送 KEY_UP。
 `input_text()` 按 Unicode 码点发送 CHAR，适合已经提交的文本；它不模拟物理按键，
-也不提供输入法预编辑或候选框定位。完整 KeyEvent 可指定原生键码、文本、未修饰文本、
+也不提供输入法预编辑或候选框定位。原生窗口的 IME 由 AppCore 处理。完整 KeyEvent 可指定原生键码、文本、未修饰文本、
 自动重复、小键盘和系统键标志。
 
 输入同样受主线程、对象关闭和运行时占用检查保护。在 Renderer、资源 loader、

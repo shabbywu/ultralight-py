@@ -1,7 +1,9 @@
 # ultralight-py
 
-Ultralight 2.x 的 Python 绑定，用于离屏渲染 HTML 页面，以及在 Python 与 JavaScript 之间共享函数和对象。
+Ultralight 2.x 的 Python 绑定，用于离屏渲染、AppCore 原生窗口，以及在 Python 与 JavaScript 之间共享函数和对象。
 
+- **原生窗口**：AppCore 系统字体、DPI、输入与 IME，共用 asyncio 循环，见 [窗口指南](docs/appcore.md)。
+- **独立 API 注册表**：装饰器注册函数、导出对象、加载前附着与导航恢复。
 - **离屏渲染**：加载 HTML 或网页，执行 JavaScript，读取 CPU 像素帧。
 - **Session 隔离**：同账号多 View 共享浏览器存储，不同 Session 隔离；支持临时和持久化存储，见 [示例](examples/sessions.py)。
 - **双向桥接**：Python 函数、对象与实时容器代理，支持 Promise / asyncio。

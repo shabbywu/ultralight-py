@@ -29,19 +29,20 @@ incrementLeft.call(right, 1); // 仍调用 left：Python 方法已经绑定实�
 ```
 
 需要在页面内联脚本执行前提供对象时，在主框架 `window_ready` 回调中调用 `bind_object()`。
-主框架导航后必须重新绑定；绑定不自动重放。
+上述文档级绑定在主框架导航后需要重新创建。需要持续恢复时使用
+[独立 API 注册表](appcore.md#注册与恢复)，对象与容器规则相同。
 
 ## 成员与身份
 
 `bind_object(name, instance, *, members=None)` 返回 `PythonBinding`。
-默认通过实例字典、slots 和类 MRO 发现公开成员，排除下划线名称。
+默认通过实例字典、`__slots__` 和类的方法解析顺序发现公开成员，排除下划线名称。
 例如 `members=["value", "increment"]` 可进一步收窄根对象的成员。
 嵌套实例仍按默认公开成员规则导出，白名单不递归限制整个对象图。
 
-属性值实时读取，赋值遵循 Python `setattr` 和 property setter。
-只读 property、方法及未暴露成员的赋值会报错。未知成员读取返回 JS undefined，
+属性值实时读取，赋值遵循 Python `setattr` 和属性设置器。
+只读属性、方法及未暴露成员的赋值会报错。未知成员读取返回 JS undefined，
 显式 `Python.getattr()` 则抛出 Python AttributeError。
-`Object.keys()` 和 `in` 只查询成员名，不执行属性 getter；不自动发现
+`Object.keys()` 和 `in` 只查询成员名，不执行属性读取器；不自动发现
 `__getattr__`、`__dir__` 构造的动态成员，也不支持 JS 修改属性描述符、原型或冻结代理。
 
 每个绑定内部，同一个 Python 对象对应同一代理，支持 `return self`、嵌套别名和循环引用。
@@ -70,7 +71,7 @@ JS 属性用于暴露 Python 方法。这样可以保持索引类型，并避免
 ```javascript
 Python.setitem(options, "keys", 42);
 const value = Python.getitem(options, "keys");
-const keys = options.keys(); // Python dict_keys 实时视图
+const keys = options.keys(); // Python 字典键的实时视图
 for (const key of Python.iter(keys)) {
   console.log(key);
 }
@@ -94,7 +95,7 @@ list/dict 的 `append`、`insert`、`pop`、`update` 等方法直接调用 Pytho
 | `Python.contains(obj, value)` | Python 成员判断；dict 检查键 |
 | `Python.slice(stop)` / `slice(start, stop, step)` | 创建 Python slice；null 表示 None |
 | `Python.iter(obj)` | Python 迭代器的 JS 适配，支持 `for...of`；结束或提前退出后释放迭代器引用 |
-| `Python.call(fn, args, kwargs)` | 调用 Python callable，kwargs 可省略；返回 awaitable 时转换为 JS Promise |
+| `Python.call(fn, args, kwargs)` | 调用 Python 可调用对象，kwargs 可省略；返回可等待对象时转换为 JS Promise |
 | `Python.to_value(obj)` | 显式复制基础容器为普通 JS Array/Object |
 
 例如传入关键字参数：
@@ -104,10 +105,10 @@ Python.call(left.increment, [], {amount: 5});
 Python.call(values.sort, [], {reverse: true});
 ```
 
-Python 迭代规则保持不变：例如遍历 dict 时改变其大小会抛 RuntimeError。
+Python 迭代规则保持不变：例如遍历字典时改变其大小会抛 RuntimeError。
 Python 异常转成 JS Error，保留异常类型和消息；通过 `view.evaluate()` 调用时表现为
-`JavaScriptError`。绑定函数和对象方法返回 awaitable 时转换为 JS Promise，
-使用方式见 [Promise 与 asyncio](api.md)。类对象、模块和二进制 buffer 不自动代理。
+`JavaScriptError`。绑定函数和对象方法返回可等待对象时转换为 JS Promise，
+使用方式见 [Promise 与 asyncio](api.md)。类对象、模块和二进制缓冲区不自动代理。
 
 ## 生命周期与撤销
 
@@ -122,7 +123,7 @@ assert binding.closed
 ```
 
 View 持有绑定，丢弃 PythonBinding 句柄不会自动解除绑定。
-`bind_function()` 使用相同的绑定机制，保留原 callable 身份；回传 Python 时恢复原 callable。
+`bind_function()` 使用相同的绑定机制，保留原可调用对象身份；回传 Python 时恢复原对象。
 每个绑定强持有已经导出的对象、容器和方法，直到显式解除绑定或文档失效；
 不承诺 JS GC 会及时释放它们。
 
@@ -132,14 +133,14 @@ View 持有绑定，丢弃 PythonBinding 句柄不会自动解除绑定。
 函数或属性回调允许解除自身绑定、导航或关闭 View；返回前会检查文档和绑定是否仍然有效。
 
 线程、输入和 Renderer 重入约束沿用 Runtime 的现有规则。Python 引用使用延迟队列释放，
-不会在 JSC 的 GC/finalizer 线程中获取 GIL。代理不持有 View 的强引用。
+不会在 JSC 的垃圾回收或终结器线程中获取 GIL。代理不持有 View 的强引用。
 `PythonBinding.closed` 可在其他线程查询；操作与显式关闭仍必须在 Python 主线程进行。
 
 ## 按值复制
 
 Python 容器使用实时代理。需要普通 JS Array/Object 时，使用 `Python.to_value()`
 复制快照，例如交给 JSON 或 JS 数组算法。复制拒绝循环引用及超过 64 层的数据，
-dict 的键必须是字符串，不复制普通 Python 实例或 dict views。
+dict 的键必须是字符串，不复制普通 Python 实例或字典视图。
 
 ```javascript
 const live = get_python_list();

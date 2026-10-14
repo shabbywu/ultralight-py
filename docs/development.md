@@ -22,10 +22,10 @@ python -c "import ultralight_py"
 python -m pip install -e . -Ccmake.define.ULTRALIGHT_SDK_ROOT=/absolute/path/to/sdk
 ```
 
-当前已验证 macOS ARM64、普通 GIL Python 3.13.16。包要求 Python 3.10+，
+本地验收以 macOS ARM64、普通 GIL Python 3.13 为主。包要求 Python 3.10+，
 其他 Python 版本尚未逐版本完成验收；
 Linux x64、Windows x64 保留依赖的构建支持，尚未完成 Python 绑定实测验收。
-pybind11 固定 v3.0.4，ulbind17 固定 `670910c`，默认 SDK 固定 2.0.0-beta.2。
+pybind11 固定 v3.0.4，ulbind17 固定 `3a31b4b`，默认 SDK 固定 2.0.0-beta.2。
 
 ## 构建与测试发行包
 
@@ -38,7 +38,7 @@ python -m pip install --force-reinstall /path/to/built.whl
 python -m pytest tests -q
 ```
 
-wheel 包含原生扩展和 UltralightCore、WebCore、Ultralight 动态库，以及内嵌资源。
+wheel 包含原生扩展和 UltralightCore、WebCore、Ultralight、AppCore 动态库，以及内嵌资源。
 本地 wheel 的平台标签取决于构建环境；ARM64 wheel 不适用于其他架构，
 当前系统上的构建不代表已验证旧版 macOS 兼容性。
 sdist 包含固定子模块的源码，不要求消费者另行拉取子模块。离线构建应显式提供 SDK；
@@ -46,13 +46,10 @@ sdist 包含固定子模块的源码，不要求消费者另行拉取子模块�
 覆盖离屏渲染、导航、回调释放、线程、异常、HTTP、本地/虚拟资源、输入重入、对象隔离、实时容器、绑定撤销及退出清理。
 Tk 测试同时覆盖模拟平台事件和真实窗口；缺少 Tk 或显示服务时跳过真实窗口用例。
 
-后续范围：JS 类构造器、Tk/asyncio 联合循环和其他平台实测。
-
-
-
 ## macOS Tk 开发环境
 
-项目开发解释器固定为普通 GIL 版本的 Python 3.13.16，Tk 使用 Homebrew 的 Tcl/Tk 8.6。
+需要运行 Tk 示例时，可使用普通 GIL Python 3.13 和 Homebrew 的 Tcl/Tk 8.6。
+以下以 Python 3.13.16 为例：
 
 ```sh
 brew install tcl-tk@8
@@ -73,10 +70,9 @@ python -m pip install build ninja '.[test,dev]'
 Promise／asyncio 双向桥接与可选定时驱动见 [API 文档](api.md)
 和 [示例](../examples/async_bridge.py)。
 
-
 ## Python 代码检查与格式化
 
-开发依赖包含固定版本的 Ruff。lint 与格式检查分别运行：
+开发依赖包含固定版本的 Ruff。代码检查与格式检查分别运行：
 
 ```bash
 python -m pip install -e '.[test,dev]'
@@ -94,3 +90,13 @@ python -m ruff format .
 `ruff check` 包含未使用导入等代码检查；`ruff format --check` 只检查格式。
 类型声明使用 `typing_extensions.Self`，以保留 Python 3.10 支持。
 
+## AppCore 验收
+
+```sh
+python -m pytest tests/test_registry.py tests/test_appcore.py -q
+python examples/appcore.py --smoke
+python examples/appcore.py --cpu --smoke
+```
+
+AppCore 测试需要 macOS 原生桌面会话。其他平台保留注册表回归与安装包加载验证，
+原生交互按 [窗口指南](appcore.md#平台验收) 在对应系统验收。

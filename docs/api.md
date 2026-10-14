@@ -1,15 +1,17 @@
 # 公开 API
 
-稳定入口为 `ultralight_py`；`_native`、下划线成员和内部包装构造器不属于公开接口。
+公开入口为 `ultralight_py`；`_native`、下划线成员和内部包装构造器不属于公开接口。
 通过 Runtime 创建 View，通过 View 或 JSValue 获取 JSValue，通过绑定方法获取 PythonBinding。
-原生 Renderer 由 Runtime 管理，不单独暴露 Renderer 类型。
+原生 Renderer 由 Runtime 管理。项目处于开发阶段，公开接口可能调整。
 
-## Runtime
+Application/Window 与独立 API 注册表的完整接口见 [窗口与注册表指南](appcore.md)。
+
+## Runtime 运行时
 
 | 接口 | 返回与约定 |
 | --- | --- |
 | `Runtime(*, assets_root=None, resource_loader=None, cache_path=None)` | 每进程共享的 Runtime；目录接受 str/PathLike，loader 返回 bytes、Resource 或 None |
-| `create_view(width, height, *, transparent=False)` | CPU 离屏 View；尺寸为正 uint32，不接受 bool |
+| `create_view(width, height, *, transparent=False, session=None)` | CPU 离屏 View；尺寸为正 uint32，不接受 bool |
 | `update()` | 推进页面加载、脚本和清理；不隐式渲染 |
 | `refresh_display(display_id=0)` | 通知显示刷新，供动画使用 |
 | `render()` | 渲染待更新的离屏页面 |
@@ -25,14 +27,14 @@
 `None` 保留 SDK 默认配置；后续传入 `None` 复用首次配置，不会重置目录。
 相同目录可以重复指定，不同目录报 ValueError。目录由 SDK 按需创建。
 同一 Runtime 的 View 使用默认浏览器 Session，共享存储；该配置不提供账号隔离，
-也不代表应用已验证登录仍然有效。
+会话隔离使用 [Session 会话](#session-会话)。
 
-## View
+## View 页面
 
 | 接口 | 返回与约定 |
 | --- | --- |
 | `load_html(html, url="")`、`load_url(url)` | 启动异步加载；html 的 URL 用作相对资源基址 |
-| `resize(width, height)` | 调整逻辑像素尺寸，校验同 create_view |
+| `resize(width, height)` | 调整设备像素尺寸，校验同 create_view |
 | `set_callbacks(*, begin_loading=None, window_ready=None, dom_ready=None, finish_loading=None, fail_loading=None, console=None, page_settled=None)` | 整组替换旧回调槽；不影响订阅和内部等待 |
 | `on(event, callback)` | 返回 Subscription；支持上述七个事件 |
 | `is_ready`、`is_settled` | 当前主页面状态；加载开始或失败时清空 |
@@ -43,7 +45,7 @@
 | `evaluate(source)` | 求值并转换为 Python 值；不负责等待页面加载 |
 | `evaluate_handle(source)` | 保留当前文档的 JSValue |
 | `bind_object(name, instance, *, members=None)` | 返回 PythonBinding；名称为非空字符串，不能为保留名 Python |
-| `bind_function(name, callback)` | callable 专用入口，返回 PythonBinding，保留原 callable 的身份 |
+| `bind_function(name, callback)` | 可调用对象专用入口，返回 PythonBinding，保留原对象的身份 |
 | `unbind(name)` | 撤销该名称绑定；名称不存在时无操作 |
 | `copy_pixels()` | 拥有独立 bytes 的 PixelBuffer，读取不清除脏区域 |
 | `clear_dirty_bounds()` | 宿主成功消费帧后清除脏区域 |
@@ -59,20 +61,20 @@ FrameEvent 和 LoadFailure 是独立、只读的事件数据；console 参数为
 
 所有 View 等待都不调用 `update()`、`refresh_display()` 或 `render()`，也不安装驱动器。
 宿主保持完整的帧循环控制权。生命周期等待观察事件；条件等待先检查一次，之后仅在
-宿主的 `Runtime.update()` 完成后重检。没有推进时不会持续轮询。
+宿主的 `Runtime.update()` 或 AppCore 步进完成后重检。没有推进时不会持续轮询。
 
 先调用 `load_html/load_url`，再等待当前待加载页面。`wait_ready` 只表示主框架 DOM
 已经解析；`wait_settled` 表示 SDK 的网络与布局静默检测已经完成。后者要求宿主持续调用
-`update → refresh_display → render`，不保证业务完成或动画永久停止。
+完整更新、显示刷新和渲染；Application 负责这一循环。它不保证业务完成或动画永久停止。
 新 View 尚未加载时 `is_ready` 为 False，等待仍受超时限制。
 
-`navigation_id` 在 Python 发起加载时立即推进，对应的主框架 begin 不重复计数。
-页面自行发起的新主框架 begin 也推进代次；iframe 和 window_ready 不推进。
+`navigation_id` 在 Python 发起加载时立即推进，对应的主框架加载开始事件不重复计数。
+页面自行发起的新主框架加载也推进代次；子框架和 `window_ready` 不推进。
 普通等待绑定开始等待时的文档，替换时抛 `UltralightError(code=PageGone)`。
 加载失败抛 `PageLoadError`，其 `failure` 保存原始 LoadFailure；关闭抛 `Closed`。
 就绪事件后、等待恢复前发生导航或关闭，也会重新检查有效性。
 
-timeout 必须是正数有限秒数，不接受 bool 或 None。超时抛 `TimeoutError`，取消传播
+`timeout` 必须是有限正数，单位为秒，不接受 bool 或 None。超时抛 `TimeoutError`，取消传播
 `asyncio.CancelledError`；仅取消等待，不停止页面加载或 JS 工作。`wait_until` 不接受
 异步谓词，谓词自身异常直接传递；选择器语法错误传递为 JavaScriptError。
 
@@ -86,7 +88,7 @@ with view.on("dom_ready", callback) as subscription:
     ...
 ```
 
-订阅由 View 保留；丢弃 token 不会取消订阅，需显式 `close()` 或退出上下文。
+订阅由 View 保留；丢弃订阅句柄不会取消订阅，需显式 `close()` 或退出上下文。
 View/Runtime 关闭会释放订阅及旧回调。内部状态先更新，再调用旧回调和按注册顺序调用
 独立订阅。单个回调异常进入 Runtime 错误处理器，其余订阅继续执行。
 分发期间新增的订阅从下次事件生效，关闭的订阅立即停止接收。
@@ -114,14 +116,14 @@ async with ScriptDriver(runtime, step=host.request_step) as driver:
 ```
 
 宿主回调契约为 `async def request_step(*, render: bool = False) -> None`。
-返回表示已经完成一次 update 和 refresh_display；render=True 时还须完成 render。
+返回表示已经完成一次 `update()` 和 `refresh_display()`；`render=True` 时还须完成 `render()`。
 请求可以排队、限频并并入宿主下一帧。适配器不直接调用引擎，多个等待合并为一个在途请求；
 后来出现的渲染需求若未进入当前请求，会在下一轮推进时提出。
 
 ScriptPage 提供 View 的四种等待以及 `evaluate(source, timeout=30)`、
 `navigate(url, *, wait_until="ready", timeout=30)` 和
 `load_html(html, url="", *, wait_until="ready", timeout=30)`；默认超时均为 30 秒。
-普通 DOM/条件等待请求 update 和 refresh；settled 以及等待任意 JS Promise 时请求完整帧。
+普通文档或条件等待请求更新和显示刷新；等待页面静默及 JS Promise 时请求完整帧。
 Beta.2 中 requestAnimationFrame Promise 需要 render 才能完成，因此异步求值也提出渲染需求。
 立即满足的条件或立即返回的 JS 值不请求推进。
 依赖 rAF 或布局的条件/选择器可传 `render=True`；明确只需脚本定时器的
@@ -136,7 +138,7 @@ async with page.expect_navigation(wait_until="ready", timeout=30):
 await page.wait_for_selector("#result")
 ```
 
-上下文退出时等待新主页面；旧页面已经 ready 不会提前完成。未发生导航会超时。
+上下文退出时等待新主页面；旧页面已经就绪不会提前完成。未发生导航会超时。
 动作与等待共用一个单调时钟预算，动作异常或取消会立即释放观察器；异步动作也受超时限制。
 超时不能抢占同步 Python/JS。同步 JS 导航可能令求值本身报 PageGone，上例用零延时任务
 让求值先返回；上下文不会吞掉动作异常。`navigate` 和 `load_html` 复用同一上下文。
@@ -156,14 +158,14 @@ await page.wait_for_selector("#result")
 | `JSValue.get(key)` | 属性值句柄；key 为 str/int，不接受 bool |
 | `JSValue.set(key, value)` | 设置属性；基础值、Python 实时代理、同文档 JSValue 均可传入 |
 | `JSValue.keys()` | 自有可枚举字符串属性名 list，不读取属性值 |
-| `JSValue.call(*args, this=None)` | 结果句柄；this 可传同文档 JSValue，保留 JS 方法 receiver |
+| `JSValue.call(*args, this=None)` | 结果句柄；this 可传同文档 JSValue，保留 JS 方法的接收对象 |
 | `JSValue.to_python()` | 基础值及普通 JS 容器按值转换；Python 代理恢复原对象 |
 | `JSValue.close()`、`closed` | closed 表示显式关闭，不能用于判断导航失效 |
 | `PythonBinding.close()`、`closed` | 撤销该绑定导出的全部代理；导航/关闭也会令 closed 为 true |
 
 两种句柄均支持 `with`。丢弃 PythonBinding 不自动解绑；丢弃 JSValue 会释放保留句柄，
 释放可能延迟到主线程调用。没有通用 `valid` 属性；操作时检查文档有效性。
-同一 Python callable 用 bind_function/bind_object 导出后，回传时恢复原 callable。
+同一 Python 可调用对象通过 `bind_function/bind_object` 导出后，回传时恢复原对象。
 不同显式绑定仍拥有独立的代理身份和撤销范围。
 
 ## 图像输出
@@ -176,12 +178,12 @@ RGBAImage 可从根包或 images 模块导入，构造为 `RGBAImage(width, heig
 
 | `ultralight_py.images` 接口 | 输出 |
 |---|---|
-| `to_pillow(frame)` | 独立可修改的 Pillow RGBA Image；需要 `[pillow]` extra |
-| `to_numpy(frame, *, copy=True)` | 可写独立的 C 连续 uint8 数组，shape 为 `(height, width, 4)`；需要 `[numpy]` extra |
+| `to_pillow(frame)` | 独立可修改的 Pillow RGBA 图像；需要安装 `[pillow]` 可选依赖 |
+| `to_numpy(frame, *, copy=True)` | 可写独立的 C 顺序的连续 uint8 数组，形状为 `(height, width, 4)`；需要安装 `[numpy]` 可选依赖 |
 | `to_numpy(frame, copy=False)` | 转换后 RGBA bytes 的只读视图，保持底层数据存活 |
 
 适配器接受 PixelBuffer 或 RGBAImage，依赖在调用时加载。缺依赖抛带安装提示的 ImportError。
-具体 stride、去预乘、校验和所有权规则见 [使用指南：像素](guide.md#像素)。
+具体行跨度、去预乘、校验和所有权规则见 [使用指南：像素](guide.md#像素)。
 
 ## 数据与错误
 
@@ -199,12 +201,13 @@ ErrorCode 是原生枚举，支持名称属性 `.name`、数值 `.value` 和 `in
 | code | 常见原因 |
 | --- | --- |
 | WrongThread | 在非 Python 主线程操作引擎或显式关闭句柄 |
-| Closed | Runtime 或 View 已关闭 |
+| Closed | Runtime、View、Window、Application 或 API 已关闭 |
 | PageGone | JS 句柄所属文档失效，或 Python 绑定已撤销 |
-| CrossContext | 把 JSValue 传给另一 View/文档 |
+| CrossContext | JSValue 属于另一文档，或 Session/View 属于另一 Runtime |
 | Busy | 重入 Renderer、输入，或在资源回调中操作引擎 |
 | ScriptException | JS 执行失败，对应 JavaScriptError |
 | TraversalLimit | 普通 JS 容器或按值复制存在循环/超过深度限制 |
+| Unsupported | AppCore Runtime 被手动驱动，或从加速 View 读取 CPU 像素 |
 
 Python 参数校验还可能直接抛 TypeError、ValueError、OverflowError。
 Python 桥接异常进入页面后为 JS Error；页面捕获后可以继续运行。
@@ -225,14 +228,14 @@ closed 是状态查询，不会启动引擎操作；PythonBinding.closed 可从�
 ## Promise 与 asyncio
 
 `await JSValue.await_result()` 等待 JS Promise，返回需要关闭的 `JSValue`。
-非 Promise 抛出 `TypeError`；rejection 抛出带错误信息的 `JavaScriptError`。
+非 Promise 抛出 `TypeError`；Promise 拒绝时抛出带错误信息的 `JavaScriptError`。
 `await View.evaluate_async(source)` 求值并返回 Python 值，普通结果直接转换。
 `await JSValue.call_async(*args, this=None)` 返回 `JSValue`，普通结果也保持为句柄。
 导航或关闭使等待以 `UltralightError(code=ErrorCode.PageGone)` 结束。
 取消 Python 等待只解除桥接监听，JS Promise 本身继续执行。
 
-绑定函数和对象方法返回 awaitable 时，JS 获得 Promise。asyncio 调度 Python
-任务；完成值在后续 `Runtime.update()` 中送入 JS。异常使 Promise rejected。
+绑定函数和对象方法返回可等待对象时，JS 获得 Promise。asyncio 调度 Python
+任务；完成值在后续 Runtime 更新或 AppCore 步进中送入 JS；异常使 Promise 拒绝。
 解绑、替换绑定、导航和关闭立即撤销投递，并请求取消桥接创建的 Task。
 传入的外部 Task/Future 只解除监听，不会被桥接取消。取消是协作式请求。
 
@@ -249,52 +252,44 @@ finally:
     driver.close()
 ```
 
-await 不隐式 update。自定义宿主可以自行调用 update，不必安装驱动器。
+`await` 不隐式推进引擎。自定义离屏宿主可自行调用 `update()`，不必安装驱动器。
 首次异步操作关联当前循环；同一 Runtime 同时只允许一个循环和一个驱动器。
-引擎操作必须在主线程执行。驱动器只 update，不渲染，也不关闭传入的 Runtime。
+引擎操作必须在主线程执行。上述离屏驱动器只更新，不渲染，也不关闭传入的 Runtime。
+AppCore 应用使用 `run/run_async`，参见 [窗口循环](appcore.md#循环和关闭)。
 更新间隔是目标调度间隔；阻塞宿主线程或长时间执行 JS 会延迟更新。
 驱动器关闭或失败会终止关联的跨语言等待和投递；`run()` 传播驱动错误，
-退出时清理定时器、监听和任务。关闭驱动器后的 JS Promise 可能保持 pending。
+退出时清理定时器、监听和任务。关闭驱动器后的 JS Promise 可能仍未完成。
 当前不提供 Tk/asyncio 联合循环或 JS AbortSignal。
 
-## Session
+## Session 会话
 
-`Runtime.create_session(name, *, persistent=False)` creates browser storage shared
-by Views in the same Session. `get_session(name)` returns the open object or `None`
-without scanning disk. `get_or_create_session(name, *, persistent=False)` reuses
-that object; a persistence mismatch raises `ValueError`. Creating an already open
-name also raises `ValueError`.
+`Runtime.create_session(name, *, persistent=False)` 创建浏览器存储会话，同一 Session 的 View
+共享存储。`get_session(name)` 返回已打开的会话或 `None`，不扫描磁盘；
+`get_or_create_session(name, *, persistent=False)` 复用已打开的会话，持久化设置不一致时
+抛 `ValueError`。重复创建同名会话也抛 `ValueError`。
 
-Names must match `[a-z0-9_-]{1,80}`. `default` and Windows device names are reserved.
-Invalid names raise `ValueError`; incorrect argument types raise `TypeError`.
-`persistent` and `force_close` accept only bool values.
+名称须匹配 `[a-z0-9_-]{1,80}`，`default` 和 Windows 设备名称保留。
+名称无效时抛 `ValueError`，参数类型错误时抛 `TypeError`；
+`persistent` 和 `force_close` 只接受 bool。
 
-Pass `session=session` to `Runtime.create_view`. `View.session` is read-only and
-cannot be switched after creation. Omitting it preserves the default SDK Session
-and returns `None` from `View.session`. A closed Session raises `Closed` when used
-for a new View; a Session owned by another Runtime raises `CrossContext`.
+创建 View 时通过 `session=session` 指定会话。`View.session` 只读，创建后不能切换；
+省略时使用 SDK 默认会话，该属性返回 `None`。使用已关闭的会话创建 View 抛 `Closed`，
+使用另一 Runtime 的会话抛 `CrossContext`。
 
-Session exposes read-only `name`, `persistent`, `disk_path`, and `closed` properties.
-`disk_path` is an absolute `Path` reported by the SDK, or `None` for temporary
-storage. Persistent Sessions use named subdirectories of `Runtime(cache_path=...)`.
-Cookies with an explicit expiry, localStorage and IndexedDB survive normal process
-shutdown. The SDK has no explicit flush API. Session storage is isolated across
-Sessions, while sessionStorage remains independent per View.
+Session 提供只读属性 `name`、`persistent`、`disk_path`、`closed`。
+临时会话的 `disk_path` 为 `None`；持久化会话使用缓存根目录下的命名子目录，
+返回 SDK 报告的绝对 `Path`。带有效期的 Cookie、localStorage 和 IndexedDB
+在正常退出后保留；SDK 没有显式刷新存储的接口。不同会话隔离存储，
+`sessionStorage` 仍按 View 独立。
 
-Runtime retains open Sessions and Views retain their Session. Closing all Views
-leaves their Session available for new Views. `session.close()` raises `Busy` while
-associated Views remain open. `session.close(force_close=True)` closes those Views,
-including page waits, subscriptions, JS handles and asynchronous bridges. Other
-Sessions' Views remain open. Closing is idempotent; metadata remains readable.
-Closing never deletes persistent data. Recreating a temporary Session with the
-same name starts empty; persistent Sessions reuse their disk directory.
+Runtime 保活已打开的 Session，View 保活所属会话。关闭全部 View 后，会话仍可复用。
+`session.close()` 在有关联 View 存活时抛 `Busy`；`close(force_close=True)` 关闭这些 View，
+并清理其等待、订阅、JS 句柄和异步桥接，其他会话的 View 继续运行。
+关闭幂等，关闭后仍可读取元数据，不删除持久化数据。同名临时会话重新创建后为空，
+同名持久化会话复用原存储目录。
 
-Session supports context management; exit calls ordinary `close()`, so Views must
-be closed first. Runtime shutdown closes Views, then explicit Sessions, then the
-Renderer. Session operations follow the same main-thread and resource-callback
-restrictions as Runtime and View. `force_close` only bypasses the View occupancy
-check. Browser storage isolation does not isolate Python code or host resources.
+上下文退出调用普通 `close()`，应先关闭关联 View。Runtime 按 View、显式 Session、
+Renderer 的顺序关闭。会话操作遵循主线程与资源回调限制；
+`force_close` 只绕过关联 View 的占用检查。会话仅隔离浏览器存储。
 
-See [the multi-Session example](../examples/sessions.py). Account configuration,
-login validity, task assignment, disk deletion, data import/export and concurrent
-cross-process access remain the application's responsibility.
+参见 [多会话示例](../examples/sessions.py)。

@@ -2,6 +2,10 @@
 
 ## 未发布
 
+- 新增 AppCore Application/Window：系统字体、DPI、原生输入与 IME，复用 Runtime、View、资源加载和 Session。
+- 新增独立 API 注册表与 `@api.register`，支持对象代理、加载前附着、导航恢复及即时更新与撤销。
+- 提供同步/asyncio 应用循环和手动步进；统一窗口关闭、页面等待、异步投递与 Python 引用清理，wheel 包含 AppCore。
+
 - 新增原生 Session API：创建、查询、复用、持久化和关闭；View 可指定 Session，支持关联 View 占用检查和强制关闭。
 
 - 增加独立 RGBAImage 与原生 BGRA/stride/去预乘转换；提供延迟加载的可选 Pillow/NumPy 输出，转换可在线程池中执行。

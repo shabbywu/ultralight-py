@@ -5,9 +5,14 @@
 - `common.hpp`：共享类型别名、字符串及 GIL 工具。
 - `python/`：Python 引用延迟释放、异常转换和基础对象注册。
 - `resources/`：Python 资源回调、文件系统和资源类型注册。
+- `appcore/`：`application.hpp` 管理应用创建、窗口托管与 RunOnce；
+  `window.hpp` 管理窗口所有权、事件及关闭；`bindings.hpp` 提供 Python API 注册入口。
+- `javascript/registry/`：`api.hpp` 管理注册定义和状态，`attachments.hpp` 管理文档附着、重放与撤销，
+  `bindings.hpp` 提供 Python API 注册入口。
 - `runtime/`：Runtime/浏览器 HostSession 创建、线程检查、错误处理及注册。
 - `view/`：View 生命周期、页面事件、加载、像素访问及注册。
-- `images/`：独立 bytes 的 BGRA/stride/去预乘转换，不访问 Renderer，像素循环释放 GIL。
+- `images/`：`conversion.hpp` 实现 BGRA、行跨度与去预乘转换；`bindings.hpp` 注册转换接口。
+  转换使用独立 bytes，不访问 Renderer，像素循环释放 GIL。
 - `input/`：通用鼠标、滚动、键盘和焦点转发，以及事件转换与 GIL 管理。
 - `javascript/`：基础类型转换、保留句柄、属性访问和函数调用及注册。
 - `javascript/objects/`：文档与绑定会话、代理工厂、对象身份及 Python 运算回调。
@@ -16,7 +21,8 @@
 
 各目录中的 `bindings.hpp` 提供对应的 `register_*` 入口。
 `runtime/views.hpp` 汇集需要 Runtime 和 View 完整类型的所有权与关闭逻辑；
-`view/javascript.hpp` 汇集 View 与 JSValue 之间的求值和函数绑定逻辑。
+`view/javascript.hpp` 汇集 View 与 JSValue 之间的求值和函数绑定逻辑，
+`view/pixels.hpp` 负责像素读取与 Python 输出。
 其余头文件通过前置声明避免 Runtime、View、JSValue 相互循环包含。
 
 Python 引用释放仍由 `python/references.hpp` 的延迟队列执行，
