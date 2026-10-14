@@ -28,6 +28,9 @@ assert package.is_relative_to(Path(sys.prefix).resolve()), package
 assert (package / 'py.typed').is_file()
 assert (package / '__init__.pyi').is_file()
 assert (package / 'images.pyi').is_file()
+assert (package / 'appcore.pyi').is_file()
+assert (package / 'registry.pyi').is_file()
+from ultralight_py import API, Application, Window
 print('Installed wheel:', package)
 """
     subprocess.run([sys.executable, "-I", "-c", probe], cwd=directory, env=env, check=True)

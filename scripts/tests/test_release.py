@@ -45,7 +45,7 @@ def make_wheel(directory, python, platform, abi=None):
         wheel.writestr(
             f"ultralight_py/_native.{python}.{'pyd' if suffix == '.dll' else 'so'}", b"native"
         )
-        for library in ("UltralightCore", "WebCore", "Ultralight"):
+        for library in ("UltralightCore", "WebCore", "Ultralight", "AppCore"):
             wheel.writestr(f"ultralight_py/{library}{suffix}", b"library")
     return path
 

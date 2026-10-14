@@ -22,6 +22,10 @@ PYTHONS = {f"cp3{minor}" for minor in range(10, 15)}
 PLATFORMS = {"linux-x64", "windows-x64", "macos-arm64"}
 WHEEL_REQUIRED = {
     "ultralight_py/py.typed",
+    "ultralight_py/appcore.py",
+    "ultralight_py/appcore.pyi",
+    "ultralight_py/registry.py",
+    "ultralight_py/registry.pyi",
     "ultralight_py/__init__.pyi",
     "ultralight_py/api.pyi",
     "ultralight_py/input.pyi",
@@ -38,6 +42,16 @@ SDIST_REQUIRED = {
     "pyproject.toml",
     "CMakeLists.txt",
     "bindings/module.cpp",
+    "bindings/images/conversion.hpp",
+    "bindings/view/pixels.hpp",
+    "bindings/appcore/bindings.hpp",
+    "bindings/appcore/application.hpp",
+    "bindings/appcore/window.hpp",
+    "bindings/javascript/registry/api.hpp",
+    "bindings/javascript/registry/attachments.hpp",
+    "bindings/javascript/registry/bindings.hpp",
+    "src/ultralight_py/appcore.py",
+    "src/ultralight_py/registry.py",
     "src/ultralight_py/py.typed",
     "src/ultralight_py/_waiting.py",
     "src/ultralight_py/events.py",
@@ -191,7 +205,7 @@ def check_wheel(path, name, version):
         require(wheel_metadata["Root-Is-Purelib"] == "false", "Expected a native wheel")
         require(WHEEL_REQUIRED <= set(names), "Missing type declarations/py.typed")
         suffix = {"linux-x64": ".so", "windows-x64": ".dll", "macos-arm64": ".dylib"}[platform]
-        for library in ("UltralightCore", "WebCore", "Ultralight"):
+        for library in ("UltralightCore", "WebCore", "Ultralight", "AppCore"):
             require(
                 any(
                     re.match(rf"^(?:lib)?{library}(?:[-.]|$)", PurePosixPath(entry).name)
