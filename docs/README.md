@@ -2,12 +2,12 @@
 
 ## 使用项目
 
-- [项目介绍与快速开始](../README.md)
+- 项目介绍与快速开始：[English](../README.md) · [简体中文](../README.zh-CN.md)
 - [使用指南](guide.md)：运行时生命周期、页面事件、桥接、资源、像素和输入。
 - [原生窗口与 API 注册表](appcore.md)：AppCore、系统字体、IME、装饰器注册和统一循环。
 - [公开 API](api.md)：接口与参数约定、页面等待、脚本驱动和异步桥接。
 - [对象桥接](objects.md)：Python 对象、实时容器、身份与撤销规则。
-- [示例代码](../examples/) · [更新日志](../CHANGELOG.md)
+- [示例代码](../examples/) · [游戏 Demo：Emberkeep](https://github.com/shabbywu/emberkeep) · [更新日志](../CHANGELOG.md)
 
 ## 开发与维护
 
