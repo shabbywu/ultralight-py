@@ -30,7 +30,7 @@ delvewheel 修复，随后在独立环境安装并测试。源码提交和 SDK �
 python -m pip install packaging
 python scripts/release.py verify --directory /path/to/release-packages \
   --manifest /path/to/release-manifest/manifest.json \
-  --version 0.4.0 --commit 完整提交SHA
+  --version 0.5.0 --commit 完整提交SHA
 ```
 
 在各目标平台创建全新虚拟环境并安装匹配的安装包。将源码包中的 `tests/`、`examples/`

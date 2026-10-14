@@ -1,6 +1,6 @@
 # 更新日志
 
-## 未发布
+## 0.5.0（待发布）
 
 - 将 API 和 AppCore 按职责拆分为公开子模块，支持 `api.runtime`、`api.view`、`api.values`、`appcore.application` 和 `appcore.window` 导入。
 - 错误、资源和页面事件类型统一由 `ultralight_py` 根入口导出；进程退出清理在首次创建 Runtime 或 Application 时注册。
