@@ -53,7 +53,20 @@ inline constexpr const char *factory_source = R"JS(
     const d=O.getOwnPropertyDescriptor(global,name);
     if(d && d.value===value && d.configurable) delete global[name];
   }
-  return {proxy,install,bind,remove,lookup:value=>identities.get(value)};
+  function namespace(name) {
+    if(O.getOwnPropertyDescriptor(global,name)) throw new TypeError('API namespace already exists: '+name);
+    const value=O.create(null);
+    define(global,name,{value,writable:false,enumerable:true,configurable:true});
+    return value;
+  }
+  function register(target,name,value) {
+    define(target,name,{value,writable:false,enumerable:true,configurable:true});
+  }
+  function unregister(target,name,value) {
+    const d=O.getOwnPropertyDescriptor(target,name);
+    if(d && d.value===value && d.configurable) delete target[name];
+  }
+  return {proxy,install,bind,remove,namespace,register,unregister,lookup:value=>identities.get(value)};
 })()
 )JS";
 }

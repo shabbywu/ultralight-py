@@ -50,14 +50,16 @@ class Driver:
 
 def install(runtime, update_interval=1 / 60):
     _support.ensure_in_main_thread()
+    if runtime.closed:
+        raise _native._make_error(_native.ErrorCode.Closed, "Runtime is closed")
+    if getattr(runtime, "_application", None) is not None:
+        raise _native._make_error(_native.ErrorCode.Unsupported, "AppCore drives this Runtime")
     if (
         isinstance(update_interval, bool)
         or not math.isfinite(update_interval)
         or update_interval <= 0
     ):
         raise ValueError("update_interval must be finite and positive")
-    if runtime.closed:
-        raise _native._make_error(_native.ErrorCode.Closed, "Runtime is closed")
     if getattr(runtime, "_async_driver", None) is not None:
         raise RuntimeError("Runtime already has an asyncio driver")
     driver = Driver(runtime, update_interval)

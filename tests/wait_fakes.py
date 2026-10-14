@@ -12,6 +12,7 @@ class NativeView:
         self.callbacks = {}
         self.is_settled = False
         self.begin_inline = True
+        self.close_callback = None
 
     def _check(self):
         if self.closed:
@@ -19,6 +20,9 @@ class NativeView:
 
     def set_callbacks(self, callbacks):
         self.callbacks = callbacks
+
+    def set_close_callback(self, callback):
+        self.close_callback = callback
 
     def emit(self, name, *, main=True, url="https://example.test"):
         event = SimpleNamespace(is_main_frame=main, frame_id=1, url=url)
@@ -36,8 +40,13 @@ class NativeView:
         self.load_html("", url)
 
     def close(self):
+        if self.closed:
+            return
         self.closed = True
         self.callbacks = {}
+        callback, self.close_callback = self.close_callback, None
+        if callback is not None:
+            callback()
 
     def _defer_close(self):
         self.close()

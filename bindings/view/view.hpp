@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include "../python/references.hpp"
 #include <optional>
 namespace binding {
@@ -11,6 +12,9 @@ struct HostView : std::enable_shared_from_this<HostView> {
     std::weak_ptr<HostRuntime> runtime;
     std::shared_ptr<HostSession> session;
     bool closed = false;
+    Ref close_callback;
+    std::map<std::string, std::function<void(Bridge &)>> installers;
+    std::map<std::string, std::function<void()>> attachment_cleanup;
     void check(bool require_open = true) const;
     void close();
     void defer_close() {
@@ -32,7 +36,20 @@ struct HostView : std::enable_shared_from_this<HostView> {
             };
         };
         callbacks.begin_loading = frame_callback("begin_loading");
-        callbacks.window_ready = frame_callback("window_ready");
+        auto external_ready = frame_callback("window_ready");
+        callbacks.window_ready = [weak = weak_from_this(), external_ready](const auto &event) {
+            py::gil_scoped_acquire gil;
+            auto self = weak.lock();
+            if (!self || self->closed) return;
+            if (event.is_main_frame) {
+                auto pending = self->installers;
+                for (auto &[name, install] : pending) {
+                    if (self->closed) break;
+                    if (self->installers.contains(name)) self->view->WithBridge(install);
+                }
+            }
+            if (!self->closed && external_ready) external_ready(event);
+        };
         callbacks.dom_ready = frame_callback("dom_ready");
         callbacks.finish_loading = frame_callback("finish_loading");
         if (values.contains("page_settled") && !values["page_settled"].is_none()) {
@@ -68,6 +85,7 @@ struct HostView : std::enable_shared_from_this<HostView> {
         }
         view->SetCallbacks(std::move(callbacks));
     }
+    py::dict copy_pixels();
     std::shared_ptr<HostValue> evaluate(std::string source);
     std::shared_ptr<objects::Session> bind_object(std::string name, py::object value, py::object members);
     void unbind(std::string name);

@@ -222,6 +222,10 @@ class Runtime:
 
     def update(self) -> None:
         _support.ensure_in_main_thread()
+        if self.closed:
+            raise _native._make_error(ErrorCode.Closed, "Runtime is closed")
+        if getattr(self, "_application", None) is not None:
+            raise _native._make_error(ErrorCode.Unsupported, "AppCore drives this Runtime")
         if self._updating:
             raise _native._make_error(ErrorCode.Busy, "Runtime.update cannot be re-entered")
         self._updating = True
@@ -259,18 +263,27 @@ class Runtime:
             _support.call(self._native.close)
         finally:
             if self.closed:
-                for view in tuple(self._views):
-                    view._state.close()
-                _asyncio.stop(self, _native._make_error(ErrorCode.Closed, "Runtime closed"))
-                driver = getattr(self, "_async_driver", None)
-                if driver is not None:
-                    driver.close()
-                script_driver = getattr(self, "_script_driver", None)
-                if script_driver is not None:
-                    script_driver.close()
-                self._sessions.clear()
-                self._resource_loader = None
-                self._error_handler = _report
+                self._finish_close()
+
+    def _finish_close(self):
+        if getattr(self, "_python_closed", False):
+            return
+        self._python_closed = True
+        for view in tuple(self._views):
+            view._state.close()
+        _asyncio.stop(self, _native._make_error(ErrorCode.Closed, "Runtime closed"))
+        driver = getattr(self, "_async_driver", None)
+        if driver is not None:
+            driver.close()
+        script_driver = getattr(self, "_script_driver", None)
+        if script_driver is not None:
+            script_driver.close()
+        self._sessions.clear()
+        self._resource_loader = None
+        self._error_handler = _report
+        application = getattr(self, "_application", None)
+        if application is not None:
+            application._finish_close()
 
     def __enter__(self) -> Self:
         _support.ensure_in_main_thread()
@@ -302,6 +315,13 @@ class View(InputView):
             return emit
 
         _support.call(native.set_callbacks, {name: forward(name) for name in _waiting.EVENTS})
+
+        def closed():
+            current = state()
+            if current is not None:
+                current.close()
+
+        _support.call(native.set_close_callback, closed)
 
     @property
     def closed(self) -> bool:

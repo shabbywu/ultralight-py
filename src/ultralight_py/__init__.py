@@ -15,6 +15,7 @@ from ultralight_py.api import (
     View,
     undefined,
 )
+from ultralight_py.appcore import Application, Window
 from ultralight_py.events import Subscription
 from ultralight_py.images import RGBAImage
 from ultralight_py.input import (
@@ -29,8 +30,11 @@ from ultralight_py.input import (
     ScrollEventType,
 )
 from ultralight_py.objects import PythonBinding
+from ultralight_py.registry import API
 
 __all__ = [
+    "API",
+    "Application",
     "ErrorCode",
     "FrameEvent",
     "JSValue",
@@ -55,5 +59,6 @@ __all__ = [
     "Subscription",
     "UltralightError",
     "View",
+    "Window",
     "undefined",
 ]

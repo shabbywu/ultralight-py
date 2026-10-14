@@ -1,5 +1,6 @@
 #pragma once
 #include "javascript.hpp"
+#include "pixels.hpp"
 namespace binding {
 inline void register_view(py::module_ &module) {
   py::class_<ulbind17::FrameEvent>(module, "FrameEvent")
@@ -22,6 +23,7 @@ inline void register_view(py::module_ &module) {
           host.check(); py::gil_scoped_release release; host.view->Resize(width, height);
       })
       .def("set_callbacks", &HostView::callbacks)
+      .def("set_close_callback", [](HostView &host, py::object callback) { host.check(); host.close_callback = reference(callback); })
       .def("_check", [](HostView &host) { host.check(); })
       .def_property_readonly("is_settled", [](HostView &host) {
           host.check(); return host.view->native()->is_settled();
@@ -29,18 +31,7 @@ inline void register_view(py::module_ &module) {
       .def("evaluate_handle", &HostView::evaluate)
       .def("bind_object", &HostView::bind_object)
       .def("unbind", &HostView::unbind)
-      .def("copy_pixels", [](HostView &host) {
-          host.check(); ulbind17::PixelBuffer pixels;
-          { py::gil_scoped_release release; pixels = host.view->CopyPixels(); }
-          py::dict result;
-          result["width"] = pixels.width; result["height"] = pixels.height;
-          result["row_bytes"] = pixels.row_bytes;
-          result["format"] = "BGRA8Premultiplied";
-          const auto &rect = pixels.dirty_bounds;
-          result["dirty_bounds"] = py::make_tuple(rect.left, rect.top, rect.right, rect.bottom);
-          result["data"] = py::bytes(reinterpret_cast<const char *>(pixels.data.data()), pixels.data.size());
-          return result;
-      })
+      .def("copy_pixels", &HostView::copy_pixels)
       .def("clear_dirty_bounds", [](HostView &host) { host.check(); host.view->ClearDirtyBounds(); })
       .def("close", &HostView::close).def("_defer_close", &HostView::defer_close)
       .def_readonly("closed", &HostView::closed);

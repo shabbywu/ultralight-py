@@ -13,7 +13,7 @@ class _Step(Protocol):
 class ScriptDriver:
     runtime: Runtime
     closed: bool
-    def __init__(self, runtime: Runtime, *, step: _Step) -> None: ...
+    def __init__(self, runtime: Runtime, *, step: _Step | None = None) -> None: ...
     @classmethod
     def auto(
         cls, runtime: Runtime, *, update_interval: float = 1 / 60, display_id: int = 0

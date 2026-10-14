@@ -11,8 +11,10 @@ from ultralight_py import _asyncio, _native, _support, _waiting
 class ScriptDriver:
     """Borrow a Runtime and ask a host to advance it, or explicitly use auto()."""
 
-    def __init__(self, runtime, *, step):
+    def __init__(self, runtime, *, step=None):
         _support.ensure_in_main_thread()
+        if step is None and getattr(runtime, "_application", None) is not None:
+            step = runtime._application._next_tick
         if not callable(step):
             raise TypeError("step must be an async callable")
         if runtime.closed:
@@ -35,6 +37,10 @@ class ScriptDriver:
     def auto(cls, runtime, *, update_interval=1 / 60, display_id=0):
         """Create an on-demand main-thread pump; never close the borrowed Runtime."""
         _support.ensure_in_main_thread()
+        if runtime.closed:
+            raise _native._make_error(_native.ErrorCode.Closed, "Runtime is closed")
+        if getattr(runtime, "_application", None) is not None:
+            raise _native._make_error(_native.ErrorCode.Unsupported, "AppCore drives this Runtime")
         _waiting.validate_timeout(update_interval, "update_interval")
         if isinstance(display_id, bool) or not isinstance(display_id, int):
             raise TypeError("display_id must be an integer")

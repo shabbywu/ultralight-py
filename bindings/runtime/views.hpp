@@ -18,18 +18,31 @@ inline void HostView::close() {
     // deferred close and callbacks that close their own View.
     auto self = shared_from_this();
     closed = true;
+    auto attached = std::exchange(attachment_cleanup, {});
+    for (auto &[name, cleanup] : attached) cleanup();
+    installers.clear();
     if (auto host = runtime.lock()) std::erase(host->views, self);
     { py::gil_scoped_release release; view->Close(); view.reset(); }
+    auto callback = std::exchange(close_callback, {});
+    if (callback) {
+        try { callback->object()(); }
+        catch (py::error_already_set &error) {
+            if (auto host = runtime.lock()) host->report(Error(Code::HostException, error.what()));
+        }
+    }
 }
 
 inline std::shared_ptr<HostView> HostRuntime::create_view(uint32_t width, uint32_t height, bool transparent, std::shared_ptr<HostSession> session) {
+    ultralight::ViewConfig config; config.is_accelerated = false; config.is_transparent = transparent;
+    return create_configured_view(width, height, config, std::move(session));
+}
+inline std::shared_ptr<HostView> HostRuntime::create_configured_view(uint32_t width, uint32_t height, const ultralight::ViewConfig &config, std::shared_ptr<HostSession> session) {
     check();
     if (session) {
         if (session->runtime.lock().get() != this) throw Error(Code::CrossContext, "Session belongs to another Runtime");
         session->check();
     }
     auto result = std::make_shared<HostView>(); result->session = session; result->runtime = shared_from_this();
-    ultralight::ViewConfig config; config.is_accelerated = false; config.is_transparent = transparent;
     { py::gil_scoped_release release; result->view.emplace(runtime->CreateView(width, height, config, session ? session->session : nullptr)); }
     views.push_back(result); return result;
 }
