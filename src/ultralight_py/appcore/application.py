@@ -1,137 +1,19 @@
-"""Native AppCore windows sharing the Python Runtime and asyncio loop."""
+"""AppCore application and event-loop driver."""
 
 from __future__ import annotations
 
 import asyncio
-import inspect
 import math
 import weakref
 from pathlib import Path
 
 from typing_extensions import Self
 
-from ultralight_py import _asyncio, _native, _support
+import ultralight_py.api._shared as _api_shared
+from ultralight_py import _asyncio, _lifecycle, _native, _support
 from ultralight_py import api as _api
-from ultralight_py.events import Subscription
-
-
-def dimension(value):
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise TypeError("Window dimensions must be numbers")
-    if not math.isfinite(value) or value <= 0:
-        raise ValueError("Window dimensions must be finite and positive")
-    return value
-
-
-def text(value, name):
-    if not isinstance(value, str):
-        raise TypeError(f"{name} must be str")
-    if "\0" in value:
-        raise ValueError(f"{name} cannot contain NUL")
-    return value
-
-
-class Window:
-    """One native window and its root View; dimensions are logical pixels."""
-
-    def __init__(self, native, application, view, title):
-        self._native = native
-        self._application = application
-        self.view = view
-        self._title = title
-        # Subscription shares the same state protocol as page subscriptions.
-        self.subscriptions = {"closed": {}, "resized": {}}
-        self._closed = False
-        weak = weakref.ref(self)
-
-        def emit(event, value):
-            current = weak()
-            if current is not None:
-                current._emit(event, value)
-
-        _support.call(native.set_callback, emit)
-
-    @property
-    def closed(self):
-        return self._closed or self._native.closed
-
-    def check_open(self):
-        _support.call(self._native.check)
-
-    @property
-    def width(self):
-        return _support.call(lambda: self._native.width)
-
-    @property
-    def height(self):
-        return _support.call(lambda: self._native.height)
-
-    @property
-    def device_width(self):
-        return _support.call(lambda: self._native.device_width)
-
-    @property
-    def device_height(self):
-        return _support.call(lambda: self._native.device_height)
-
-    @property
-    def device_scale(self):
-        return _support.call(lambda: self._native.device_scale)
-
-    @property
-    def title(self):
-        self.check_open()
-        return self._title
-
-    @title.setter
-    def title(self, value):
-        _support.call(self._native.set_title, text(value, "title"))
-        self._title = value
-
-    def on(self, event, callback):
-        self.check_open()
-        if event not in self.subscriptions:
-            raise ValueError(f"Unknown Window event: {event!r}")
-        if not callable(callback):
-            raise TypeError("callback must be callable")
-        subscription = Subscription(self, event, callback)
-        self.subscriptions[event][subscription] = None
-        return subscription
-
-    def _emit(self, event, value):
-        if self._closed:
-            return
-        if event == "closed":
-            self._closed = True
-            self.view._state.close()
-            self._application._windows.discard(self)
-            if not self._application._windows:
-                self._application.close()
-        for subscription in tuple(self.subscriptions[event]):
-            if subscription.closed:
-                continue
-            try:
-                result = subscription._callback(value)
-                if inspect.isawaitable(result):
-                    if inspect.iscoroutine(result):
-                        result.close()
-                    raise TypeError("Window event callbacks must be synchronous")
-            except Exception as error:  # noqa: BLE001 — isolate window subscribers
-                self._application.runtime._report_callback_error(error)
-        if event == "closed":
-            for subscriptions in self.subscriptions.values():
-                for subscription in tuple(subscriptions):
-                    subscription.close()
-
-    def close(self):
-        _support.call(self._native.close)
-
-    def __enter__(self) -> Self:
-        self.check_open()
-        return self
-
-    def __exit__(self, *exc):
-        self.close()
+from ultralight_py.appcore import _shared
+from ultralight_py.appcore.window import Window
 
 
 class Application:
@@ -152,13 +34,13 @@ class Application:
             raise _native._make_error(
                 _native.ErrorCode.InvalidArgument, "Create Application before Runtime"
             )
-        _api._callable(resource_loader, "resource_loader")
-        _api._bool(force_cpu_renderer, "force_cpu_renderer")
+        _api_shared.validate_callable(resource_loader, "resource_loader")
+        _api_shared.validate_bool(force_cpu_renderer, "force_cpu_renderer")
         assets = Path.cwd() if assets_root is None else Path(assets_root).resolve()
         cache = None if cache_path is None else Path(cache_path).resolve()
-        text(str(assets), "assets_root")
+        _shared.text(str(assets), "assets_root")
         if cache is not None:
-            text(str(cache), "cache_path")
+            _shared.text(str(cache), "cache_path")
         self._windows = set()
         self._closed = False
         self._closing = False
@@ -166,13 +48,14 @@ class Application:
         self._running = False
         self._tick_waiters = set()
         self._wake = None
+        _lifecycle.register_shutdown()
         self._native = _support.call(
             _native._Application.create,
             str(assets),
             resource_loader,
             "" if cache is None else str(cache),
-            text(app_name, "app_name"),
-            text(developer_name, "developer_name"),
+            _shared.text(app_name, "app_name"),
+            _shared.text(developer_name, "developer_name"),
             force_cpu_renderer,
         )
         runtime = object.__new__(_api.Runtime)
@@ -182,10 +65,10 @@ class Application:
         runtime._views = weakref.WeakSet()
         runtime._sessions = {}
         runtime._updating = False
-        runtime._error_handler = _api._report
+        runtime._error_handler = _api_shared.report_error
         runtime._native = self._native.runtime
         runtime._application = self
-        runtime._native.set_error_handler(_api._report)
+        runtime._native.set_error_handler(_api_shared.report_error)
         self.runtime = runtime
         _api.Runtime._instance = runtime
 
@@ -206,15 +89,15 @@ class Application:
         fullscreen=False,
     ):
         _support.ensure_in_main_thread()
-        dimension(width)
-        dimension(height)
-        text(title, "title")
+        _shared.dimension(width)
+        _shared.dimension(height)
+        _shared.text(title, "title")
         for name, value in (
             ("transparent", transparent),
             ("resizable", resizable),
             ("fullscreen", fullscreen),
         ):
-            _api._bool(value, name)
+            _api_shared.validate_bool(value, name)
         if view is not None:
             if not isinstance(view, _api.View):
                 raise TypeError("view must be View or None")

@@ -6,8 +6,8 @@ import tkinter as tk
 from collections.abc import Callable
 from dataclasses import replace
 
-from ultralight_py import _support, _validation
-from ultralight_py.api import ErrorCode, UltralightError, View
+from ultralight_py import ErrorCode, UltralightError, _support, _validation
+from ultralight_py.api import View
 from ultralight_py.input import KeyCode, KeyEvent, KeyEventType, Modifiers, MouseButton
 
 _KEYS = {

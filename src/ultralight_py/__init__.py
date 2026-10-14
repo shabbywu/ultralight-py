@@ -1,19 +1,22 @@
 """Python bindings for Ultralight."""
 
+from ultralight_py import _native, _waiting
+
+ErrorCode = _native.ErrorCode
+FrameEvent = _native.FrameEvent
+JavaScriptError = _native.JavaScriptError
+LoadFailure = _native.LoadFailure
+PageLoadError = _waiting.PageLoadError
+Resource = _native.Resource
+UltralightError = _native.UltralightError
+undefined = _native.undefined
+
 from ultralight_py.api import (
-    ErrorCode,
-    FrameEvent,
-    JavaScriptError,
     JSValue,
-    LoadFailure,
-    PageLoadError,
     PixelBuffer,
-    Resource,
     Runtime,
     Session,
-    UltralightError,
     View,
-    undefined,
 )
 from ultralight_py.appcore import Application, Window
 from ultralight_py.events import Subscription

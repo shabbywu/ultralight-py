@@ -2,6 +2,9 @@
 
 ## 未发布
 
+- 将 API 和 AppCore 按职责拆分为公开子模块，支持 `api.runtime`、`api.view`、`api.values`、`appcore.application` 和 `appcore.window` 导入。
+- 错误、资源和页面事件类型统一由 `ultralight_py` 根入口导出；进程退出清理在首次创建 Runtime 或 Application 时注册。
+
 - 新增 AppCore Application/Window：系统字体、DPI、原生输入与 IME，复用 Runtime、View、资源加载和 Session。
 - 新增独立 API 注册表与 `@api.register`，支持对象代理、加载前附着、导航恢复及即时更新与撤销。
 - 提供同步/asyncio 应用循环和手动步进；统一窗口关闭、页面等待、异步投递与 Python 引用清理，wheel 包含 AppCore。

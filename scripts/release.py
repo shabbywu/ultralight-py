@@ -22,12 +22,21 @@ PYTHONS = {f"cp3{minor}" for minor in range(10, 15)}
 PLATFORMS = {"linux-x64", "windows-x64", "macos-arm64"}
 WHEEL_REQUIRED = {
     "ultralight_py/py.typed",
-    "ultralight_py/appcore.py",
-    "ultralight_py/appcore.pyi",
+    "ultralight_py/_lifecycle.py",
+    "ultralight_py/api/__init__.py",
+    "ultralight_py/api/__init__.pyi",
+    "ultralight_py/api/_shared.py",
+    "ultralight_py/api/runtime.py",
+    "ultralight_py/api/view.py",
+    "ultralight_py/api/values.py",
+    "ultralight_py/appcore/__init__.py",
+    "ultralight_py/appcore/__init__.pyi",
+    "ultralight_py/appcore/_shared.py",
+    "ultralight_py/appcore/application.py",
+    "ultralight_py/appcore/window.py",
     "ultralight_py/registry.py",
     "ultralight_py/registry.pyi",
     "ultralight_py/__init__.pyi",
-    "ultralight_py/api.pyi",
     "ultralight_py/input.pyi",
     "ultralight_py/objects.pyi",
     "ultralight_py/_waiting.py",
@@ -50,7 +59,6 @@ SDIST_REQUIRED = {
     "bindings/javascript/registry/api.hpp",
     "bindings/javascript/registry/attachments.hpp",
     "bindings/javascript/registry/bindings.hpp",
-    "src/ultralight_py/appcore.py",
     "src/ultralight_py/registry.py",
     "src/ultralight_py/py.typed",
     "src/ultralight_py/_waiting.py",
@@ -73,6 +81,8 @@ SDIST_REQUIRED = {
     "tests/wait_fakes.py",
     "tests/waiting_cases.py",
 }
+SDIST_REQUIRED |= {f"src/{path}" for path in WHEEL_REQUIRED}
+
 FORBIDDEN_PARTS = {
     ".git",
     "__pycache__",

@@ -12,12 +12,14 @@ Python 层提供公开 API、Python 语义和可选宿主集成。支持 CPU 离
 
 ## Python 依赖
 
-`__init__.py` 和对应类型声明 只汇总公开导出。`api.py` 提供 Runtime/Session/View/JSValue；
+`__init__.py` 和对应类型声明 只汇总公开导出。`api/` 按 runtime、view、values 分离 Runtime/Session/View/JSValue/PixelBuffer；
 `input.py` 提供数据与输入混入类；`objects.py` 提供 PythonBinding；
-`appcore.py` 提供 Application/Window，`registry.py` 提供独立 API 注册表。
+`appcore/` 按 application、window 分离 Application/Window，`registry.py` 提供独立 API 注册表。
 共享的内部实现通过私有模块导入：`_objects.py` 提供原生代理的成员策略和运算，
 `_asyncio.py` 管理循环关联、Promise 等待和延迟投递，`_validation.py` 提供输入校验，
 `_support.py` 提供主线程检查和原生调用封装。
+`_lifecycle.py` 在首次创建 Runtime 或 Application 时注册一次进程退出清理。
+根入口从 `_native` 和 `_waiting` 导出错误、资源和页面事件类型。
 `integrations/asyncio.py` 保留公开的 Driver、install 和 run 接口。
 `_waiting.py` 管理页面代次、事件分发与被动等待，`events.py` 提供 Subscription；
 `scripting.py` 集中合并脚本推进需求，默认借用宿主回调，`auto()` 工厂显式管理按需循环。
@@ -30,7 +32,7 @@ Runtime 更新或 AppCore 步进返回原生调用后才重检条件谓词；Vie
 原生调用共用 `_support.py` 的主线程入口与清理机制，输入与绑定关闭不反向依赖公开 api 模块。
 `_objects.unwrap()` 通过 `_api.JSValue` 识别公共句柄；模块初始化时不读取尚未定义的类型。
 
-`api.pyi`、`input.pyi`、`objects.pyi`、`events.pyi`、`scripting.pyi` 分别描述对应模块，根类型声明 只重新导出同一类型，
+`api/__init__.pyi`、`input.pyi`、`objects.pyi`、`events.pyi`、`scripting.pyi` 分别描述对应模块，根类型声明定义原生公开类型并重新导出 Python API 类型，
 避免根入口与模块入口出现两个不同的静态类型。Tk 适配器拥有独立类型声明。
 公开可调用对象 直接交给对象绑定，不再通过临时 Python 函数包装其身份。
 
@@ -99,7 +101,7 @@ ScriptPage.expect_navigation 在动作前登记，共用动作和页面等待的
 
 ## AppCore 与持久注册表
 
-`appcore.py` 提供 Application/Window 与持续 asyncio 驱动，`registry.py` 提供独立 API。
+`appcore/` 按 application、window 分离 Application/Window 与持续 asyncio 驱动，`registry.py` 提供独立 API。
 原生 `bindings/appcore/` 通过 ulbind17 Application 接入现有 HostRuntime，窗口采用
 ManagedView/AdoptPanel；AppCore 平台初始化保留 Python FileSystemOverlay，使用系统字体。
 窗口 View 使用窗口默认配置，离屏 View 仍为 CPU。AppCore 独占 Renderer 驱动。

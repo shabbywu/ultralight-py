@@ -4,7 +4,8 @@ from typing import Literal
 
 from typing_extensions import Self
 
-from ultralight_py.api import Resource, Runtime, Session, View
+from ultralight_py import Resource
+from ultralight_py.api import Runtime, Session, View
 from ultralight_py.events import Subscription
 
 class Window:

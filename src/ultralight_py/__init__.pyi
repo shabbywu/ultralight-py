@@ -1,37 +1,84 @@
-from ultralight_py.api import (
-    ErrorCode as ErrorCode,
-)
-from ultralight_py.api import (
-    FrameEvent as FrameEvent,
-)
-from ultralight_py.api import (
-    JavaScriptError as JavaScriptError,
-)
+from typing import ClassVar
+
+class ErrorCode:
+    InvalidArgument: ClassVar[ErrorCode]
+    WrongThread: ClassVar[ErrorCode]
+    Closed: ClassVar[ErrorCode]
+    Busy: ClassVar[ErrorCode]
+    PageGone: ClassVar[ErrorCode]
+    CrossContext: ClassVar[ErrorCode]
+    ScriptException: ClassVar[ErrorCode]
+    HostException: ClassVar[ErrorCode]
+    Unsupported: ClassVar[ErrorCode]
+    TypeMismatch: ClassVar[ErrorCode]
+    TraversalLimit: ClassVar[ErrorCode]
+    __members__: ClassVar[dict[str, ErrorCode]]
+    def __init__(self, value: int) -> None: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def value(self) -> int: ...
+    def __int__(self) -> int: ...
+
+class UltralightError(RuntimeError):
+    code: ErrorCode
+    stack: str
+    source_url: str
+    line: float
+    column: float
+
+class JavaScriptError(UltralightError): ...
+class _Undefined: ...
+
+undefined: _Undefined
+
+class Resource:
+    def __init__(
+        self, data: bytes, mime_type: str | None = None, charset: str = "utf-8"
+    ) -> None: ...
+    @property
+    def data(self) -> bytes: ...
+    @property
+    def mime_type(self) -> str: ...
+    @property
+    def charset(self) -> str: ...
+
+class FrameEvent:
+    @property
+    def frame_id(self) -> int: ...
+    @property
+    def is_main_frame(self) -> bool: ...
+    @property
+    def url(self) -> str: ...
+
+class LoadFailure:
+    @property
+    def frame(self) -> FrameEvent: ...
+    @property
+    def description(self) -> str: ...
+    @property
+    def domain(self) -> str: ...
+    @property
+    def code(self) -> int: ...
+
+class PageLoadError(RuntimeError):
+    failure: LoadFailure
+    def __init__(self, failure: LoadFailure) -> None: ...
+
 from ultralight_py.api import (
     JSValue as JSValue,
 )
 from ultralight_py.api import (
-    LoadFailure as LoadFailure,
-)
-from ultralight_py.api import PageLoadError as PageLoadError
-from ultralight_py.api import (
     PixelBuffer as PixelBuffer,
-)
-from ultralight_py.api import (
-    Resource as Resource,
 )
 from ultralight_py.api import (
     Runtime as Runtime,
 )
-from ultralight_py.api import Session as Session
 from ultralight_py.api import (
-    UltralightError as UltralightError,
+    Session as Session,
 )
 from ultralight_py.api import (
     View as View,
-)
-from ultralight_py.api import (
-    undefined as undefined,
 )
 from ultralight_py.appcore import Application as Application
 from ultralight_py.appcore import Window as Window

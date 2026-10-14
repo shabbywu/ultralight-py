@@ -1,81 +1,28 @@
 from collections.abc import Callable, Sequence
 from os import PathLike
 from pathlib import Path
-from typing import Any, ClassVar, Literal, TypedDict, TypeVar, overload
+from typing import Any, Literal, TypedDict, TypeVar, overload
 
 from typing_extensions import Self
 
+from ultralight_py import (
+    FrameEvent as _FrameEvent,
+)
+from ultralight_py import (
+    LoadFailure as _LoadFailure,
+)
+from ultralight_py import (
+    Resource as _Resource,
+)
+from ultralight_py import (
+    UltralightError as _UltralightError,
+)
 from ultralight_py.events import Subscription as Subscription
 from ultralight_py.images import RGBAImage
 from ultralight_py.input import InputView as _InputView
 from ultralight_py.objects import PythonBinding as PythonBinding
 
 _T = TypeVar("_T")
-
-class ErrorCode:
-    InvalidArgument: ClassVar[ErrorCode]
-    WrongThread: ClassVar[ErrorCode]
-    Closed: ClassVar[ErrorCode]
-    Busy: ClassVar[ErrorCode]
-    PageGone: ClassVar[ErrorCode]
-    CrossContext: ClassVar[ErrorCode]
-    ScriptException: ClassVar[ErrorCode]
-    HostException: ClassVar[ErrorCode]
-    Unsupported: ClassVar[ErrorCode]
-    TypeMismatch: ClassVar[ErrorCode]
-    TraversalLimit: ClassVar[ErrorCode]
-    __members__: ClassVar[dict[str, ErrorCode]]
-    def __init__(self, value: int) -> None: ...
-    @property
-    def name(self) -> str: ...
-    @property
-    def value(self) -> int: ...
-    def __int__(self) -> int: ...
-
-class UltralightError(RuntimeError):
-    code: ErrorCode
-    stack: str
-    source_url: str
-    line: float
-    column: float
-
-class JavaScriptError(UltralightError): ...
-class _Undefined: ...
-
-undefined: _Undefined
-
-class Resource:
-    def __init__(
-        self, data: bytes, mime_type: str | None = None, charset: str = "utf-8"
-    ) -> None: ...
-    @property
-    def data(self) -> bytes: ...
-    @property
-    def mime_type(self) -> str: ...
-    @property
-    def charset(self) -> str: ...
-
-class FrameEvent:
-    @property
-    def frame_id(self) -> int: ...
-    @property
-    def is_main_frame(self) -> bool: ...
-    @property
-    def url(self) -> str: ...
-
-class LoadFailure:
-    @property
-    def frame(self) -> FrameEvent: ...
-    @property
-    def description(self) -> str: ...
-    @property
-    def domain(self) -> str: ...
-    @property
-    def code(self) -> int: ...
-
-class PageLoadError(RuntimeError):
-    failure: LoadFailure
-    def __init__(self, failure: LoadFailure) -> None: ...
 
 class _ConsoleEvent(TypedDict):
     message: str
@@ -128,7 +75,7 @@ class Runtime:
         cls,
         *,
         assets_root: str | PathLike[str] | None = None,
-        resource_loader: Callable[[str], bytes | Resource | None] | None = None,
+        resource_loader: Callable[[str], bytes | _Resource | None] | None = None,
         cache_path: str | PathLike[str] | None = None,
     ) -> Self: ...
     @property
@@ -147,7 +94,7 @@ class Runtime:
     def update(self) -> None: ...
     def refresh_display(self, display_id: int = 0) -> None: ...
     def render(self) -> None: ...
-    def set_error_handler(self, callback: Callable[[UltralightError], Any] | None) -> None: ...
+    def set_error_handler(self, callback: Callable[[_UltralightError], Any] | None) -> None: ...
     def close(self) -> None: ...
     def __enter__(self) -> Self: ...
     def __exit__(self, *exc: object) -> None: ...
@@ -164,16 +111,16 @@ class View(_InputView):
     @property
     def navigation_id(self) -> int: ...
     @property
-    def load_failure(self) -> LoadFailure | None: ...
+    def load_failure(self) -> _LoadFailure | None: ...
     @overload
     def on(
         self,
         event: Literal["begin_loading", "window_ready", "dom_ready", "finish_loading"],
-        callback: Callable[[FrameEvent], Any],
+        callback: Callable[[_FrameEvent], Any],
     ) -> Subscription: ...
     @overload
     def on(
-        self, event: Literal["fail_loading"], callback: Callable[[LoadFailure], Any]
+        self, event: Literal["fail_loading"], callback: Callable[[_LoadFailure], Any]
     ) -> Subscription: ...
     @overload
     def on(
@@ -193,11 +140,11 @@ class View(_InputView):
     def set_callbacks(
         self,
         *,
-        begin_loading: Callable[[FrameEvent], Any] | None = None,
-        window_ready: Callable[[FrameEvent], Any] | None = None,
-        dom_ready: Callable[[FrameEvent], Any] | None = None,
-        finish_loading: Callable[[FrameEvent], Any] | None = None,
-        fail_loading: Callable[[LoadFailure], Any] | None = None,
+        begin_loading: Callable[[_FrameEvent], Any] | None = None,
+        window_ready: Callable[[_FrameEvent], Any] | None = None,
+        dom_ready: Callable[[_FrameEvent], Any] | None = None,
+        finish_loading: Callable[[_FrameEvent], Any] | None = None,
+        fail_loading: Callable[[_LoadFailure], Any] | None = None,
         console: Callable[[_ConsoleEvent], Any] | None = None,
         page_settled: Callable[[str], Any] | None = None,
     ) -> None: ...
