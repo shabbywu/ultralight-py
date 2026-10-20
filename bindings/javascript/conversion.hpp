@@ -137,11 +137,12 @@ inline py::list arguments_from_js(Bridge &bridge, JSValueRef args) {
     }
     return result;
 }
-inline std::unique_ptr<Bridge::Handle> copy_to_js(Bridge &bridge, py::handle value,
-                                          ulbind17::jsc::Traversal &walk) {
-    if (value.ptr() == undefined) return bridge.retain(bridge.makeUndefined());
-    if (value.is_none()) return bridge.retain(bridge.makeNull());
-    if (py::isinstance<py::bool_>(value)) return bridge.retain(bridge.makeBoolean(value.cast<bool>()));
+// Unretained values are for immediate callback returns. Other callers must root
+// them before executing anything that could reenter JavaScript or trigger GC.
+inline std::optional<JSValueRef> scalar_to_js(Bridge &bridge, py::handle value) {
+    if (value.ptr() == undefined) return bridge.makeUndefined();
+    if (value.is_none()) return bridge.makeNull();
+    if (py::isinstance<py::bool_>(value)) return bridge.makeBoolean(value.cast<bool>());
     if (py::isinstance<py::int_>(value)) {
         constexpr long long limit = 9007199254740991LL;
         int overflow = 0;
@@ -151,14 +152,19 @@ inline std::unique_ptr<Bridge::Handle> copy_to_js(Bridge &bridge, py::handle val
             PyErr_SetString(PyExc_OverflowError, "Python int exceeds the JavaScript safe integer range");
             throw py::error_already_set();
         }
-        return bridge.retain(bridge.makeNumber(static_cast<double>(integer)));
+        return bridge.makeNumber(static_cast<double>(integer));
     }
-    if (py::isinstance<py::float_>(value)) return bridge.retain(bridge.makeNumber(value.cast<double>()));
+    if (py::isinstance<py::float_>(value)) return bridge.makeNumber(value.cast<double>());
     if (py::isinstance<py::str>(value)) {
         auto text = unicode(value);
         ulbind17::jsc::String string{std::span<const char16_t>(text)};
-        return bridge.retain(JSValueMakeString(bridge.context(), string));
+        return JSValueMakeString(bridge.context(), string);
     }
+    return std::nullopt;
+}
+inline std::unique_ptr<Bridge::Handle> copy_to_js(Bridge &bridge, py::handle value,
+                                          ulbind17::jsc::Traversal &walk) {
+    if (auto scalar = scalar_to_js(bridge, value)) return bridge.retain(*scalar);
     if (py::isinstance<py::list>(value) || py::isinstance<py::tuple>(value)) {
         auto guard = walk.enter(value.ptr());
         auto array = bridge.retain(bridge.makeArray());

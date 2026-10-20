@@ -2,6 +2,7 @@
 #include "../value.hpp"
 #include <map>
 #include <atomic>
+#include <unordered_map>
 namespace binding::objects {
 struct Document;
 struct Session;
@@ -18,6 +19,8 @@ struct Session : std::enable_shared_from_this<Session> {
     std::atomic_bool closed = false;
     std::string name;
     std::map<std::string, std::shared_ptr<Node>> nodes;
+    // Nodes own the Python objects; this index only shortcuts repeated exports.
+    std::unordered_map<PyObject *, std::weak_ptr<Node>> exact_containers;
     std::vector<std::shared_ptr<Ref>> cursors;
     std::map<void *, std::function<void()>> async_cleanup;
     JSValueRef root = nullptr;
@@ -26,12 +29,23 @@ struct Session : std::enable_shared_from_this<Session> {
         closed = true;
         auto pending = std::exchange(async_cleanup, {});
         for (auto &[key, cancel] : pending) { try { cancel(); } catch (...) {} }
+        exact_containers.clear();
         nodes.clear();
         for (auto &cursor : cursors) cursor->reset();
         cursors.clear();
         root = nullptr;
     }
     void close();
+    // Borrow only after checking the session. The owning Node retains the proxy.
+    JSValueRef cached_container(py::handle value) const {
+        if (PyList_CheckExact(value.ptr()) || PyDict_CheckExact(value.ptr())) {
+            auto found = exact_containers.find(value.ptr());
+            if (found != exact_containers.end()) {
+                if (auto node = found->second.lock()) return node->proxy->value();
+            }
+        }
+        return nullptr;
+    }
     std::unique_ptr<Bridge::Handle> convert(Bridge &, py::handle, py::handle members = py::none());
 };
 struct Document : std::enable_shared_from_this<Document> {
