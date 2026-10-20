@@ -1,6 +1,13 @@
 # 更新日志
 
-## 0.6.0（待发布）
+## 0.6.1（待发布）
+
+- 优化 JS 高频读取 Python list/dict：内置容器通过原生路径读取，减少重复生命周期检查及 Python 分发。
+- 读取操作改用数字操作码，数组下标以 number 传递；普通内置标量直接返回，嵌套容器复用已有代理，减少临时句柄分配和延迟释放。
+- 保留实时共享、代理身份、子类与 awaitable 行为、整数安全范围及 Unicode 语义；补充键比较和析构回调重入、绑定撤销等回归测试。
+- 新增可复现的容器读取性能基准，比较实时代理、预先复制与包含复制成本的路径；记录本地测量及高频计算的快照选择建议。
+
+## 0.6.0
 
 - **Breaking**：可变容器默认双向共享。Python list/dict 在 JS 中支持索引、length、原生 Array 方法、Object 枚举与直接 JSON 序列化；JS Array/普通对象在 Python 中为 JSArray/JSObject 容器视图。
 - evaluate、evaluate_async、ScriptPage.evaluate 和 to_python 增加 copy=True，显式生成独立的 Python list/dict；默认共享路径支持别名、循环引用和跨语言混合容器。

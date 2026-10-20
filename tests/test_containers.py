@@ -17,6 +17,10 @@ import pytest
         "snapshots",
         "lifecycle",
         "asynchronous",
+        "reads",
+        "subclasses",
+        "read_reentrancy",
+        "scalar_reads",
     ],
 )
 def test_shared_containers(case, tmp_path):

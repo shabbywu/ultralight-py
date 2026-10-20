@@ -8,7 +8,9 @@ inline constexpr const char *factory_source = R"JS(
   const jsIdentities=new WeakMap();
   let sequence=0;
   const splice=Array.prototype.splice;
-  const index=k=>typeof k==='string' && /^(0|[1-9][0-9]*)$/.test(k) && Number(k)<4294967295;
+  // Private read codes shared with proxy.hpp.
+  const itemGet=1, itemHas=2, itemLength=3;
+  const index=k=>typeof k==='string' && /^(0|[1-9][0-9]*)$/.test(k) && +k<4294967295;
   function identify(value) {
     if(!jsIdentities.has(value)) jsIdentities.set(value,++sequence);
     return jsIdentities.get(value);
@@ -27,22 +29,24 @@ inline constexpr const char *factory_source = R"JS(
   function proxy(native, callable, token, kind) {
     const array=kind==='list', mapping=kind==='dict', data=array||mapping;
     const target=array ? [] : callable ? (...args)=>native('call',args) : O.create(null);
-    const has=k=>typeof k==='string' && (!array||index(k)) && native('item_has',k);
+    const has=k=>typeof k==='string' && (!array||index(k)) && native(itemHas,array ? +k : k);
     function syncLength() {
-      const length=native('item_length');
+      const length=native(itemLength);
       if(length>4294967295) throw new RangeError('Python list exceeds JavaScript Array length');
       target.length=length;
       return length;
     }
     const value=new P(target, {
       get(t,k,r) {
-        native('guard');
         if(array) {
           if(k==='length') return syncLength();
-          if(index(k)) return native('item_get',k);
+          if(index(k)) return native(itemGet,+k);
+          native('guard');
           return R.get(t,k,r);
         }
-        if(mapping) return typeof k==='string' ? native('item_get',k) : undefined;
+        if(mapping && typeof k==='string') return native(itemGet,k);
+        native('guard');
+        if(mapping) return undefined;
         if(k===Symbol.toStringTag) return 'PythonProxy';
         if(typeof k!=='string') return undefined;
         if(native('has',k)) return native('get',k);
@@ -63,19 +67,21 @@ inline constexpr const char *factory_source = R"JS(
         native('set',k,v); return true;
       },
       has(t,k) {
+        if(data && typeof k==='string' && (!array||index(k))) return native(itemHas,array ? +k : k) || (array && R.has(t,k));
         native('guard');
         if(array) return k==='length'||has(k)||R.has(t,k);
         return data ? has(k) : typeof k==='string' && native('has',k);
       },
       ownKeys() {
-        native('guard');
         if(array) syncLength();
         return data ? array ? [...native('item_keys'),'length'] : native('item_keys') : native('keys');
       },
       getOwnPropertyDescriptor(t,k) {
-        native('guard');
         if(array && k==='length') {syncLength();return R.getOwnPropertyDescriptor(t,k);}
-        if(data) return has(k) ? {configurable:true,enumerable:true,writable:true,value:native('item_get',k)} : undefined;
+        if(data && typeof k==='string' && (!array||index(k)))
+          return has(k) ? {configurable:true,enumerable:true,writable:true,value:native(itemGet,array ? +k : k)} : undefined;
+        native('guard');
+        if(data) return undefined;
         if(typeof k==='string' && native('has',k)) return {configurable:true,enumerable:true};
         return R.getOwnPropertyDescriptor(t,k);
       },

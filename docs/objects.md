@@ -91,6 +91,22 @@ console.log(JSON.stringify(options));
 JS 在调用 Proxy 前已把 `options[1]` 转为 `options["1"]`：两者都访问 Python 字符串键，
 不会访问整数键 1。非字符串键通过下面的高级 Python 接口访问，不会自动转字符串。
 
+### 高频读取
+
+实时代理每次读取都会跨越 JS/Python 边界，包括下标、字段和 length。
+对大容器只访问少量数据时，可以避免复制整棵对象图；需要反复遍历或计算时，
+可在循环前通过 `Python.to_value` 复制所需的子树，再使用原生 JS 容器：
+
+```javascript
+const history = Python.to_value(left.history);
+const total = history.reduce((sum, value) => sum + value, 0);
+```
+
+复制成本取决于数据规模，是否划算还取决于后续访问次数。快照独立于原对象，
+不会接收 Python 后续修改，修改快照也不会写回 Python。
+实时代理始终读取原对象的当前值，嵌套代理的身份复用不缓存数据、长度或键集合。
+性能对比脚本及测量方法见 [开发指南](development.md#容器读取性能基准)。
+
 ## JS 容器在 Python 中的视图
 
 ```python

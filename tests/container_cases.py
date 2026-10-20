@@ -290,6 +290,205 @@ def lifecycle():
         raises(UltralightError, lambda: len(obj), ErrorCode.PageGone)
 
 
+def reads():
+    with Runtime() as runtime:
+        view = runtime.create_view(16, 16)
+        load(runtime, view, "<body>")
+        child = {"value": 1}
+        items = [child, child, undefined]
+        mapping = {"items": items, "别名\0😀": child}
+        mapping["self"] = mapping
+        binding = view.bind_object("data", mapping)
+        assert view.evaluate("data.items[0]===data.items[1] && data.self===data")
+        assert view.evaluate("data['别名\\0😀']===data.items[0]")
+        view.evaluate("globalThis.savedChild=data.items[0];globalThis.savedItems=data.items;void 0")
+        child["value"] = 9
+        items.append(4)
+        assert view.evaluate("data.items.length===4 && savedChild.value===9")
+        assert view.evaluate("data.items[2]===undefined && 2 in data.items")
+        assert view.evaluate("data.items[4294967294]===undefined && !(4294967294 in data.items)")
+        assert view.evaluate("data.missing===undefined && !('missing' in data)")
+        assert (
+            view.evaluate("data.items.map(x=>typeof x).join(',')")
+            == "object,object,undefined,number"
+        )
+        replacement = {"value": 10}
+        items[0] = replacement
+        assert view.evaluate("data.items[0]!==savedChild && data.items[0].value===10")
+        assert view.evaluate("data.items[1]===savedChild")
+        view.evaluate("Array.prototype[20]=42;void 0")
+        assert view.evaluate("20 in data.items")
+        assert view.evaluate("Object.getOwnPropertyDescriptor(data.items,'20')") is undefined
+        binding.close()
+        for source in [
+            "savedChild.value",
+            "savedChild[Symbol.iterator]",
+            "'value' in savedChild",
+            "Object.keys(savedChild)",
+            "Object.getOwnPropertyDescriptor(savedChild,'value')",
+            "Object.getOwnPropertyDescriptor(savedChild,Symbol.iterator)",
+            "savedItems.length",
+            "savedItems[0]",
+            "savedItems[Symbol.iterator]",
+            "'length' in savedItems",
+            "0 in savedItems",
+            "Object.keys(savedItems)",
+            "Object.getOwnPropertyDescriptor(savedItems,'length')",
+            "Object.getOwnPropertyDescriptor(savedItems,Symbol.iterator)",
+        ]:
+            raises(JavaScriptError, lambda source=source: view.evaluate(source))
+
+
+def subclasses():
+    class Items(list):
+        def __len__(self):
+            return super().__len__() + 1
+
+        def __getitem__(self, key):
+            return super().__getitem__(key) + 10
+
+    class Mapping(dict):
+        def get(self, key, default=None):
+            return 42 if key == "value" else super().get(key, default)
+
+        def __contains__(self, key):
+            return False
+
+    with Runtime() as runtime:
+        view = runtime.create_view(16, 16)
+        load(runtime, view, "<body>")
+        items = Items([1, 2])
+        mapping = Mapping(value=3)
+        view.bind_object("items", items)
+        view.bind_object("mapping", mapping)
+        assert view.evaluate("items.length") == 3
+        assert view.evaluate("items[0]") == 11
+        assert view.evaluate("2 in items")
+        assert view.evaluate("mapping.value") == 42
+        assert view.evaluate("'value' in mapping") is False
+        assert view.evaluate("mapping.missing") is undefined
+        assert view.evaluate("mapping") is mapping
+
+
+def read_reentrancy():
+    class Key:
+        def __init__(self, action):
+            self.action = action
+
+        def __hash__(self):
+            return hash("value")
+
+        def __eq__(self, other):
+            if other == "value":
+                self.action()
+                return True
+            return False
+
+    with Runtime() as runtime:
+        for source in ["data.value", "'value' in data"]:
+            view = runtime.create_view(16, 16)
+            load(runtime, view, "<body>")
+            key = Key(None)
+            binding = view.bind_object("data", {key: [1]})
+            key.action = binding.close
+            # The active read is discarded when its equality callback revokes it.
+            assert view.evaluate(source) is (undefined if source == "data.value" else False)
+            assert binding.closed
+            view.close()
+        for source in ["data.value", "'value' in data"]:
+            view = runtime.create_view(16, 16)
+            load(runtime, view, "<body>")
+            view.bind_object("data", {Key(view.close): [1]})
+            raises(
+                UltralightError,
+                lambda view=view, source=source: view.evaluate(source),
+                ErrorCode.PageGone,
+            )
+            assert view.closed
+
+        def fail():
+            raise ValueError("comparison failed")
+
+        view = runtime.create_view(16, 16)
+        load(runtime, view, "<body>")
+        view.bind_object("data", {Key(fail): 7})
+        for source in ["data.value", "'value' in data"]:
+            error = raises(JavaScriptError, lambda source=source: view.evaluate(source))
+            assert "ValueError: comparison failed" in str(error)
+
+
+def scalar_reads():
+    with Runtime() as runtime:
+        view = runtime.create_view(16, 16)
+        load(runtime, view, "<body>")
+        values = [
+            None,
+            undefined,
+            True,
+            False,
+            9007199254740991,
+            -9007199254740991,
+            -0.0,
+            float("nan"),
+            float("inf"),
+            float("-inf"),
+            "文字\0😀",
+            "\ud800",
+        ]
+        view.bind_object("values", values)
+        view.bind_object("mapping", {"value": "文字\0😀"})
+        assert view.evaluate("values[0]===null && values[1]===undefined")
+        assert view.evaluate("values[2]===true && values[3]===false")
+        assert view.evaluate("values[4]===9007199254740991 && values[5]===-9007199254740991")
+        assert view.evaluate("Object.is(values[6],-0) && Number.isNaN(values[7])")
+        assert view.evaluate("values[8]===Infinity && values[9]===-Infinity")
+        assert view.evaluate("values[10]") == "文字\0😀"
+        assert view.evaluate("values[11].charCodeAt(0)") == 0xD800
+        assert view.evaluate("mapping.value===values[10]")
+        assert view.evaluate("Object.getOwnPropertyDescriptor(values,'4').value") == values[4]
+        assert view.evaluate("""
+          (()=>{
+            const original=Number;
+            Number=()=>0;
+            try {return values[2]===true && (2 in values) && values.length===12;}
+            finally {Number=original;}
+          })()
+        """)
+        for key in ["01", "1e0", "1.5", "-0", "-1", "4294967295"]:
+            assert view.evaluate(f"values['{key}']") is undefined
+            assert view.evaluate(f"'{key}' in values") is False
+        assert view.evaluate("values[4294967294]") is undefined
+        for value in [9007199254740992, -9007199254740992, 10**100]:
+            values[0] = value
+            error = raises(JavaScriptError, lambda: view.evaluate("values[0]"))
+            assert "OverflowError" in str(error)
+
+        finalized = []
+
+        class TransientString(str):
+            def __del__(self):
+                # A subclass finalizer can allocate and reenter JS before the
+                # outer native callback returns. Its JS result must stay rooted.
+                view.evaluate("""
+                  globalThis.pressure=Array.from({length:4096},(_,i)=>({text:'x'.repeat(128)+i}));
+                  void 0;
+                """)
+                finalized.append(True)
+
+        class Mapping(dict):
+            def get(self, key, default=None):
+                return TransientString("temporary\0😀")
+
+        view.bind_object("transient", Mapping())
+        assert view.evaluate("""
+          Array.from({length:20},()=>transient.value).every(x=>x==='temporary\\0😀')
+        """)
+        assert len(finalized) == 20
+        # Exercise SDK task draining as well as repeated immediate returns.
+        runtime.update()
+        assert view.evaluate("mapping.value") == "文字\0😀"
+
+
 def asynchronous():
     async def run():
         with Runtime() as runtime:
@@ -312,6 +511,25 @@ def asynchronous():
                 view.bind_function("edit", edit)
                 assert await view.evaluate_async("edit(data).then(x=>x===data)")
                 assert observed[0] is live and live == [1, 2, 3]
+
+                class AwaitableInt(int):
+                    def __await__(self):
+                        async def resolve():
+                            return int(self)
+
+                        return resolve().__await__()
+
+                class AwaitableList(list):
+                    def __await__(self):
+                        async def resolve():
+                            return len(self)
+
+                        return resolve().__await__()
+
+                view.bind_object("awaitables", [AwaitableInt(7), AwaitableList([1, 2])])
+                assert await view.evaluate_async(
+                    "Promise.all([awaitables[0],awaitables[1]])", copy=True
+                ) == [7, 2]
 
                 async def step(*, render=False):
                     runtime.update()

@@ -62,6 +62,12 @@ Document 弱引用 HostView，并持有 Python WeakValueDictionary；JS WeakMap 
 回传代理恢复其原始对象。JS 数组检测使用捕获的 Array.isArray，SDK 的 JSC C API 不识别数组 Proxy。
 公共 Python `bind_function()` 校验对象是否可调用，原生层统一使用 bind_object 绑定。
 
+容器读取使用私有数字操作码，list 下标以 number 传入原生层。
+普通内置标量在原生回调中直接返回，转换与显式复制共用整数范围及 UTF-16 处理。
+标量子类可能在析构时重入 JS，仍使用保留句柄的转换路径。
+精确内置 list/dict 的已有代理由 Session 中的 Node 保留；检查有效性后，
+回调可直接借用代理，避免临时 Handle 及其 PostTask 释放。需要跨调用存储的值仍须 retain。
+
 ## 所有权和清理
 
 Runtime 强持有尚未关闭的原生 View 包装，View 弱引用 Runtime。
