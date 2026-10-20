@@ -124,7 +124,7 @@ def values():
         assert echo.call(cycle).to_python() is cycle
         raises(
             UltralightError,
-            lambda: view.evaluate("let cycle={}; cycle.self=cycle; cycle"),
+            lambda: view.evaluate("let cycle={}; cycle.self=cycle; cycle", copy=True),
             ErrorCode.TraversalLimit,
         )
         nested = []

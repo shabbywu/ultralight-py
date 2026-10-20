@@ -14,7 +14,7 @@ inline JSValueRef helper_call(const std::weak_ptr<Document> &weak, std::span<con
         }
         scope->check();
         ulbind17::jsc::Traversal walk;
-        auto positional = py::list(from_js(*b, args[1], walk));
+        auto positional = arguments_from_js(*b, args[1]);
         py::object result;
         if (operation == "getattr") {
             if (positional.size() != 2) throw py::type_error("getattr expects an object and a member name");
@@ -23,7 +23,12 @@ inline JSValueRef helper_call(const std::weak_ptr<Document> &weak, std::span<con
                 original && original->members ? original->members->object() : py::none());
         } else if (operation == "to_value") {
             if (positional.size() != 1) throw py::type_error("to_value expects one object");
-            return copy_to_js(*b, positional[0], walk)->value();
+            auto value = policy(doc).attr("unwrap")(positional[0]);
+            if (py::isinstance<HostValue>(value)) {
+                auto original = HostValue::convert(*b, value);
+                value = from_js(*b, original->value(), walk, true);
+            }
+            return copy_to_js(*b, value, walk)->value();
         } else if (operation == "iter") {
             if (positional.size() != 1) throw py::type_error("iter expects one object");
             return make_iterator(scope, *b, positional[0]);

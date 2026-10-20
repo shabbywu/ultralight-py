@@ -147,16 +147,16 @@ class View(InputView):
     def evaluate_handle(self, source: str) -> JSValue:
         return JSValue(_support.call(self._native.evaluate_handle, source))
 
-    def evaluate(self, source: str):
+    def evaluate(self, source: str, *, copy: bool = False):
         with self.evaluate_handle(source) as value:
-            return value.to_python()
+            return value.to_python(copy=copy)
 
-    async def evaluate_async(self, source: str):
+    async def evaluate_async(self, source: str, *, copy: bool = False):
         with self.evaluate_handle(source) as value:
             if _support.call(value._native.is_promise):
                 with await value.await_result() as result:
-                    return result.to_python()
-            return value.to_python()
+                    return result.to_python(copy=copy)
+            return value.to_python(copy=copy)
 
     def bind_object(
         self, name: str, instance: object, *, members: Sequence[str] | None = None

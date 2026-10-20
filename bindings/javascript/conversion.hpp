@@ -60,8 +60,12 @@ inline void set_property(Bridge &bridge, JSValueRef target, std::string_view nam
 
 std::optional<py::object> proxy_from_js(Bridge &, JSValueRef);
 std::unique_ptr<Bridge::Handle> to_js(Bridge &, py::handle);
+py::object container_from_js(Bridge &, JSValueRef, bool);
+bool is_array(Bridge &, JSValueRef);
+std::optional<py::object> copied_js_container(Bridge &, py::handle, ulbind17::jsc::Traversal &);
+std::unique_ptr<Bridge::Handle> copy_to_js(Bridge &, py::handle, ulbind17::jsc::Traversal &);
 
-inline py::object from_js(Bridge &bridge, JSValueRef value, ulbind17::jsc::Traversal &walk) {
+inline py::object from_js(Bridge &bridge, JSValueRef value, ulbind17::jsc::Traversal &walk, bool copy = false) {
     auto ctx = bridge.context();
     auto root = bridge.retain(value);
     if (JSValueIsUndefined(ctx, value)) return py::reinterpret_borrow<py::object>(undefined);
@@ -75,17 +79,30 @@ inline py::object from_js(Bridge &bridge, JSValueRef value, ulbind17::jsc::Trave
     }
     if (JSValueIsString(ctx, value)) return py::str(bridge.readString(value));
     if (!JSValueIsObject(ctx, value)) throw py::type_error("JavaScript value requires a JSValue handle");
-    if (auto proxy = proxy_from_js(bridge, value)) return *proxy;
+    if (auto proxy = proxy_from_js(bridge, value)) {
+        if (!copy) return *proxy;
+        if (py::isinstance<py::tuple>(*proxy)) {
+            auto snapshot = copy_to_js(bridge, *proxy, walk);
+            return from_js(bridge, snapshot->value(), walk, true);
+        }
+        if (!py::isinstance<py::list>(*proxy) && !py::isinstance<py::dict>(*proxy))
+            throw py::type_error("Only basic containers can be copied");
+    }
     auto object = JSValueToObject(ctx, value, nullptr);
     if (JSObjectIsFunction(ctx, object) || bridge.isPromise(value))
         throw py::type_error("Functions and Promises require a JSValue handle");
-    auto guard = walk.enter(object);
-    if (JSValueIsArray(ctx, value)) {
+    if (is_array(bridge, value)) {
+        if (!copy) return container_from_js(bridge, value, true);
+        auto guard = walk.enter(object);
         py::list result;
-        auto length = without_gil([&] { return bridge.length(value); });
+        auto length_value = get_property(bridge, value, "length");
+        auto number = bridge.readNumber(length_value->value());
+        if (!std::isfinite(number) || number < 0 || number > 4294967295.0 || std::trunc(number) != number)
+            throw Error(Code::TypeMismatch, "Invalid JavaScript array length");
+        auto length = static_cast<std::size_t>(number);
         for (std::size_t i = 0; i < length; ++i) {
             auto property = get_property(bridge, value, std::to_string(i));
-            result.append(from_js(bridge, property->value(), walk));
+            result.append(from_js(bridge, property->value(), walk, true));
         }
         return std::move(result);
     }
@@ -99,13 +116,26 @@ inline py::object from_js(Bridge &bridge, JSValueRef value, ulbind17::jsc::Trave
         if (!JSValueIsStrictEqual(ctx, prototype->value(), expected->value()))
             throw py::type_error("Non-plain JavaScript objects require a JSValue handle");
     }
+    if (!copy) return container_from_js(bridge, value, false);
+    auto guard = walk.enter(object);
     py::dict result;
     auto keys = without_gil([&] { return bridge.keys(value); });
     for (const auto &key : keys) {
         auto property = get_property(bridge, value, key);
-        result[py::str(key)] = from_js(bridge, property->value(), walk);
+        result[py::str(key)] = from_js(bridge, property->value(), walk, true);
     }
     return std::move(result);
+}
+// The argument envelope belongs to the bridge; only its elements are user values.
+inline py::list arguments_from_js(Bridge &bridge, JSValueRef args) {
+    py::list result;
+    ulbind17::jsc::Traversal walk;
+    auto length = without_gil([&] { return bridge.length(args); });
+    for (std::size_t i = 0; i < length; ++i) {
+        auto value = get_property(bridge, args, std::to_string(i));
+        result.append(from_js(bridge, value->value(), walk));
+    }
+    return result;
 }
 inline std::unique_ptr<Bridge::Handle> copy_to_js(Bridge &bridge, py::handle value,
                                           ulbind17::jsc::Traversal &walk) {
@@ -151,6 +181,7 @@ inline std::unique_ptr<Bridge::Handle> copy_to_js(Bridge &bridge, py::handle val
         }
         return object;
     }
+    if (auto copied = copied_js_container(bridge, value, walk)) return copy_to_js(bridge, *copied, walk);
     throw py::type_error("Unsupported Python value; use basic values or a JSValue handle");
 }
 } // namespace binding

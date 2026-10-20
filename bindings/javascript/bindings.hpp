@@ -19,7 +19,9 @@ inline void register_javascript(py::module_ &module) {
           return without_gil([&] { return bridge.keys(value.handle->value()); });
       }); })
       .def("call", &HostValue::call, py::arg("this") = py::none())
-      .def("to_python", &HostValue::python).def("close", &HostValue::close)
-      .def_readonly("closed", &HostValue::closed);
+      .def("container", &HostValue::container)
+      .def("to_python", &HostValue::python, py::kw_only(), py::arg("copy") = false)
+      .def("close", &HostValue::close)
+      .def_property_readonly("closed", &HostValue::is_closed);
 }
 } // namespace binding

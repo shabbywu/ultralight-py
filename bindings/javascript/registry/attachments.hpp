@@ -22,7 +22,7 @@ inline void HostAPI::install(HostView *target, Bridge &bridge) {
     if (found == attachments.end()) return;
     auto lifetime = found->second;
     auto &attached = *lifetime;
-    auto doc = objects::document(bridge);
+    auto doc = objects::document(bridge, target->shared_from_this());
     if (attached.document.lock() != doc) {
         for (auto &[entry, scope] : attached.scopes) scope->invalidate();
         attached.scopes.clear(); attached.root.reset(); attached.document = doc;

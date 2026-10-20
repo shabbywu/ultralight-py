@@ -15,7 +15,14 @@ inline JSValueRef node_call(const std::weak_ptr<Node> &weak, std::span<const JSV
         auto allowed = node->members ? node->members->object() : py::none();
         py::object result;
         if (operation == "guard") return bridge->makeUndefined();
-        if (operation == "has" || operation == "keys") {
+        if (operation.starts_with("item_")) {
+            auto positional = py::list();
+            ulbind17::jsc::Traversal walk;
+            for (std::size_t i = 1; i < args.size(); ++i) positional.append(from_js(*bridge, args[i], walk));
+            result = policy(doc).attr("container")(object, operation, positional);
+            if (scope->closed || !bridge->active()) return nullptr;
+            if (operation == "item_keys") return copy_to_js(*bridge, result, walk)->value();
+        } else if (operation == "has" || operation == "keys") {
             auto names = policy(doc).attr("members")(object, allowed);
             if (operation == "has") {
                 ulbind17::jsc::Traversal walk;
@@ -24,10 +31,8 @@ inline JSValueRef node_call(const std::weak_ptr<Node> &weak, std::span<const JSV
             } else result = names;
             ulbind17::jsc::Traversal walk;
             return copy_to_js(*bridge, result, walk)->value();
-        }
-        if (operation == "call") {
-            ulbind17::jsc::Traversal walk;
-            auto positional = from_js(*bridge, args[1], walk);
+        } else if (operation == "call") {
+            auto positional = arguments_from_js(*bridge, args[1]);
             result = object(*py::tuple(positional));
         } else {
             ulbind17::jsc::Traversal walk;
@@ -67,7 +72,10 @@ inline std::unique_ptr<Bridge::Handle> Session::convert(Bridge &b, py::handle va
         return node_call(weak, args);
     }));
     auto token = b.retain(b.makeObject(std::weak_ptr<Node>(node), Bridge::ObjectHooks{}));
-    const JSValueRef args[] = {native->value(), b.makeBoolean(PyCallable_Check(value.ptr())), token->value()};
+    auto kind = py::isinstance<py::list>(value) ? "list" : py::isinstance<py::dict>(value) ? "dict" : "object";
+    ulbind17::jsc::Traversal walk;
+    auto shape = copy_to_js(b, py::str(kind), walk);
+    const JSValueRef args[] = {native->value(), b.makeBoolean(PyCallable_Check(value.ptr())), token->value(), shape->value()};
     node->proxy = doc->invoke(b, "proxy", args);
     nodes.emplace(key, node);
     return b.retain(node->proxy->value());

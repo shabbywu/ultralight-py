@@ -5,7 +5,7 @@ namespace binding {
 inline std::shared_ptr<HostValue> HostView::evaluate(std::string source) {
     check(); auto self = shared_from_this();
     return view->WithBridge([&](Bridge &bridge) {
-        (void)objects::document(bridge);
+        (void)objects::document(bridge, self);
         auto text = unicode(source);
         ulbind17::jsc::String script{std::span<const char16_t>(text)};
         std::unique_ptr<Bridge::Handle> result;
@@ -22,7 +22,7 @@ inline std::shared_ptr<objects::Session> HostView::bind_object(std::string name,
     check();
     if (name.empty() || name == "Python") throw py::value_error("Binding name must be nonempty and cannot be Python");
     return view->WithBridge([&](Bridge &bridge) {
-        auto doc = objects::document(bridge); auto scope = doc->session();
+        auto doc = objects::document(bridge, shared_from_this()); auto scope = doc->session();
         auto proxy = scope->convert(bridge, value, members);
         ulbind17::jsc::Traversal walk;
         auto key = copy_to_js(bridge, py::str(name), walk);

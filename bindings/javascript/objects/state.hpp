@@ -36,6 +36,8 @@ struct Session : std::enable_shared_from_this<Session> {
 };
 struct Document : std::enable_shared_from_this<Document> {
     std::weak_ptr<Bridge> bridge;
+    std::weak_ptr<HostView> view;
+    Ref containers;
     Bridge *registry_key = nullptr;
     Ref policy;
     std::unique_ptr<Bridge::Handle> factory;
@@ -68,7 +70,7 @@ struct Document : std::enable_shared_from_this<Document> {
         return without_gil([&] { return b.retain(b.call(JSValueToObject(b.context(), fn->value(), nullptr), args)); });
     }
 };
-inline std::shared_ptr<Document> document(Bridge &);
+inline std::shared_ptr<Document> document(Bridge &, std::shared_ptr<HostView> = {});
 inline void Session::check() const {
     if (closed) throw Error(Code::PageGone, "Python binding has been revoked");
     auto doc = document.lock();

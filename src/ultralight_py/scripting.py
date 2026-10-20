@@ -277,11 +277,11 @@ class ScriptPage:
             self.view.wait_for_selector(selector, timeout), timeout=timeout, render=render
         )
 
-    async def evaluate(self, source, timeout=30, *, render=True):
+    async def evaluate(self, source, timeout=30, *, render=True, copy=False):
         # Arbitrary Promises may depend on rAF/layout, which beta.2 dispatches
         # during Render(). Plain values still finish before any step is requested.
         return await self._driver._run(
-            self.view.evaluate_async(source), timeout=timeout, render=render
+            self.view.evaluate_async(source, copy=copy), timeout=timeout, render=render
         )
 
     def expect_navigation(self, *, wait_until="ready", timeout=30):

@@ -42,7 +42,7 @@ struct HostAPI : std::enable_shared_from_this<HostAPI> {
                 view->view->WithBridge([&](Bridge &bridge) {
                     auto lifetime = attachments.at(view.get());
                     auto &attached = *lifetime;
-                    auto doc = objects::document(bridge);
+                    auto doc = objects::document(bridge, view);
                     if (attached.document.lock() != doc || !attached.root) install(view.get(), bridge);
                     else {
                         auto definition = entries.at(entry);

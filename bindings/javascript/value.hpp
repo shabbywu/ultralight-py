@@ -2,6 +2,7 @@
 #include "../view/view.hpp"
 #include "conversion.hpp"
 namespace binding {
+py::object container_operation(Bridge &, JSValueRef, const std::string &, py::args);
 struct PromiseWatch { Ref callback; void close() { callback.reset(); } };
 struct HostValue {
     std::weak_ptr<HostView> view;
@@ -46,8 +47,16 @@ struct HostValue {
         auto name = property_key(key);
         with([&](Bridge &bridge) { auto converted = convert(bridge, value); set_property(bridge, handle->value(), name, converted->value()); });
     }
-    py::object python() {
-        return with([&](Bridge &bridge) { ulbind17::jsc::Traversal walk; return from_js(bridge, handle->value(), walk); });
+    py::object python(bool copy = false) {
+        return with([&](Bridge &bridge) { ulbind17::jsc::Traversal walk; return from_js(bridge, handle->value(), walk, copy); });
+    }
+    py::object container(const std::string &operation, py::args args) {
+        return with([&](Bridge &bridge) { return container_operation(bridge, handle->value(), operation, args); });
+    }
+    bool is_closed() const {
+        if (closed) return true;
+        try { return with([](Bridge &) { return false; }); }
+        catch (const Error &error) { if (error.code == Code::PageGone) return true; throw; }
     }
     std::shared_ptr<HostValue> call(py::args args, py::object receiver) {
         auto owner = checked();

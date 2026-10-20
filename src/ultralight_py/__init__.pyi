@@ -66,6 +66,12 @@ class PageLoadError(RuntimeError):
     def __init__(self, failure: LoadFailure) -> None: ...
 
 from ultralight_py.api import (
+    JSArray as JSArray,
+)
+from ultralight_py.api import (
+    JSObject as JSObject,
+)
+from ultralight_py.api import (
     JSValue as JSValue,
 )
 from ultralight_py.api import (

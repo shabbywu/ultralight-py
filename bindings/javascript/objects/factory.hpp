@@ -5,26 +5,85 @@ inline constexpr const char *factory_source = R"JS(
   const O=Object, R=Reflect, P=Proxy, define=O.defineProperty;
   const global=globalThis;
   const identities=new WeakMap();
-  function proxy(native, callable, token) {
-    const target=callable ? (...args)=>native('call',args) : O.create(null);
+  const jsIdentities=new WeakMap();
+  let sequence=0;
+  const splice=Array.prototype.splice;
+  const index=k=>typeof k==='string' && /^(0|[1-9][0-9]*)$/.test(k) && Number(k)<4294967295;
+  function identify(value) {
+    if(!jsIdentities.has(value)) jsIdentities.set(value,++sequence);
+    return jsIdentities.get(value);
+  }
+  function container(value,op,...args) {
+    if(op==='length') return value.length;
+    if(op==='get') return R.get(value,args[0]);
+    if(op==='set') {
+      if(!R.set(value,args[0],args[1])) throw new TypeError('JavaScript property is read-only');
+    } else if(op==='delete') {
+      if(!R.deleteProperty(value,args[0])) throw new TypeError('JavaScript property cannot be deleted');
+    } else if(op==='splice') {
+      R.apply(splice,value,args);
+    } else throw new TypeError('Unknown JavaScript container operation: '+op);
+  }
+  function proxy(native, callable, token, kind) {
+    const array=kind==='list', mapping=kind==='dict', data=array||mapping;
+    const target=array ? [] : callable ? (...args)=>native('call',args) : O.create(null);
+    const has=k=>typeof k==='string' && (!array||index(k)) && native('item_has',k);
+    function syncLength() {
+      const length=native('item_length');
+      if(length>4294967295) throw new RangeError('Python list exceeds JavaScript Array length');
+      target.length=length;
+      return length;
+    }
     const value=new P(target, {
-      get(t,k) {
+      get(t,k,r) {
         native('guard');
+        if(array) {
+          if(k==='length') return syncLength();
+          if(index(k)) return native('item_get',k);
+          return R.get(t,k,r);
+        }
+        if(mapping) return typeof k==='string' ? native('item_get',k) : undefined;
         if(k===Symbol.toStringTag) return 'PythonProxy';
         if(typeof k!=='string') return undefined;
         if(native('has',k)) return native('get',k);
         if(callable && ['call','apply','bind','name','length'].includes(k)) return R.get(t,k);
         return undefined;
       },
-      set(t,k,v) {native('set',k,v); return true;},
-      has(t,k) {native('guard');return typeof k==='string' && native('has',k);},
-      ownKeys() {return native('keys');},
+      set(t,k,v) {
+        native('guard');
+        if(array && k==='length') {
+          const n=+v;
+          if(!Number.isInteger(n)||n<0||n>4294967295) throw new RangeError('Invalid array length');
+          native('item_resize',n); syncLength(); return true;
+        }
+        if(data) {
+          if(typeof k!=='string'||(array&&!index(k))) throw new TypeError('Unsupported Python container property');
+          native('item_set',k,v); return true;
+        }
+        native('set',k,v); return true;
+      },
+      has(t,k) {
+        native('guard');
+        if(array) return k==='length'||has(k)||R.has(t,k);
+        return data ? has(k) : typeof k==='string' && native('has',k);
+      },
+      ownKeys() {
+        native('guard');
+        if(array) syncLength();
+        return data ? array ? [...native('item_keys'),'length'] : native('item_keys') : native('keys');
+      },
       getOwnPropertyDescriptor(t,k) {
         native('guard');
+        if(array && k==='length') {syncLength();return R.getOwnPropertyDescriptor(t,k);}
+        if(data) return has(k) ? {configurable:true,enumerable:true,writable:true,value:native('item_get',k)} : undefined;
         if(typeof k==='string' && native('has',k)) return {configurable:true,enumerable:true};
         return R.getOwnPropertyDescriptor(t,k);
       },
-      deleteProperty() {native('guard');throw new TypeError('Use Python.delitem for element deletion');},
+      deleteProperty(t,k) {
+        native('guard');
+        if(data && typeof k==='string' && (!array||index(k))) {native('item_delete',k);return true;}
+        throw new TypeError('Unsupported Python proxy deletion');
+      },
       defineProperty() {native('guard');throw new TypeError('Python proxy descriptors cannot be changed');},
       getPrototypeOf(t) {native('guard');return R.getPrototypeOf(t);},
       isExtensible(t) {native('guard');return R.isExtensible(t);},
@@ -66,7 +125,7 @@ inline constexpr const char *factory_source = R"JS(
     const d=O.getOwnPropertyDescriptor(target,name);
     if(d && d.value===value && d.configurable) delete target[name];
   }
-  return {proxy,install,bind,remove,namespace,register,unregister,lookup:value=>identities.get(value)};
+  return {proxy,install,bind,remove,namespace,register,unregister,identify,container,array:Array.isArray,lookup:value=>identities.get(value)};
 })()
 )JS";
 }

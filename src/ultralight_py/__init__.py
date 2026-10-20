@@ -12,6 +12,8 @@ UltralightError = _native.UltralightError
 undefined = _native.undefined
 
 from ultralight_py.api import (
+    JSArray,
+    JSObject,
     JSValue,
     PixelBuffer,
     Runtime,
@@ -40,6 +42,8 @@ __all__ = [
     "Application",
     "ErrorCode",
     "FrameEvent",
+    "JSArray",
+    "JSObject",
     "JSValue",
     "JavaScriptError",
     "KeyCode",

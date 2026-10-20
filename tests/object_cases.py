@@ -62,7 +62,7 @@ def instances():
         assert (left.value, right.value) == (6, 103)
         assert view.evaluate("left.child===left && left.myself()===left")
         assert view.evaluate("left") is left
-        view.evaluate("left.shared.append(7)")
+        view.evaluate("left.shared.push(7)")
         assert right.shared == [7]
         view.evaluate("left.value=12; left.doubled=30")
         assert left.value == 15 and left.reads == 0
@@ -119,10 +119,10 @@ def containers():
         mapping = {"keys": 9, 1: "integer"}
         view.bind_object("items", items)
         view.bind_object("mapping", mapping)
-        assert view.evaluate("Array.isArray(items)") is False
-        assert view.evaluate("items[0]") is undefined
+        assert view.evaluate("Array.isArray(items)") is True
+        assert view.evaluate("items[0]") == 1
         assert view.evaluate("Python.getitem(items,-1)") == 3
-        view.evaluate("Python.setitem(items,-1,7); items.append(8); items.insert(0,0)")
+        view.evaluate("Python.setitem(items,-1,7); items.push(8); items.unshift(0)")
         assert items == [0, 1, 2, 7, 8]
         items[1] = 10
         assert view.evaluate("Python.getitem(items,1)") == 10
@@ -134,11 +134,15 @@ def containers():
         assert view.evaluate("Python.contains(items,7) && Python.len(items)===4")
         assert view.evaluate("Python.getitem(mapping,'keys')") == 9
         assert view.evaluate("Python.getitem(mapping,1)") == "integer"
-        view.evaluate("mapping.update({enabled:true}); Python.setitem(mapping,'keys',42)")
+        view.evaluate("Object.assign(mapping,{enabled:true}); Python.setitem(mapping,'keys',42)")
         assert mapping["keys"] == 42 and mapping["enabled"] is True
-        assert view.evaluate("[...Python.iter(mapping.keys())]") == ["keys", 1, "enabled"]
+        assert view.evaluate("[...Python.iter(Python.getattr(mapping,'keys')())]") == [
+            "keys",
+            1,
+            "enabled",
+        ]
         assert view.evaluate(
-            "Python.call(items.sort,[],{reverse:true}); Python.to_value(items)"
+            "Python.call(Python.getattr(items,'sort'),[],{reverse:true}); Python.to_value(items)"
         ) == [8, 7, 4, 3]
         view.bind_object("immutable", (1, 2))
         assert view.evaluate("Python.getitem(immutable,-1)") == 2
@@ -189,7 +193,7 @@ def conversion():
         assert isinstance(view.evaluate("2.5"), float)
         view.bind_function("nested", lambda: counter.values)
         assert view.evaluate("nested()") is counter.values
-        view.evaluate("nested().append(9)")
+        view.evaluate("nested().push(9)")
         assert counter.values[-1] == 9
         view.bind_function("keyword", lambda *, value: value)
         assert view.evaluate("Python.call(keyword,[],{value:42})") == 42
@@ -235,7 +239,7 @@ def revocation():
             "saved.value",
             "saved.value=8",
             "method()",
-            "child.append(7)",
+            "child.push(7)",
             "it.next()",
             "Object.keys(saved)",
             "'value' in saved",

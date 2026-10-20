@@ -6,6 +6,7 @@ import inspect
 import operator
 import types
 
+from ultralight_py import _native
 from ultralight_py import api as _api
 
 
@@ -37,7 +38,65 @@ def identity(value):
 
 
 def unwrap(value):
-    return value._native if isinstance(value, _api.JSValue) else value
+    return (
+        value._native if isinstance(value, (_api.JSValue, _api.JSArray, _api.JSObject)) else value
+    )
+
+
+def container(value, operation, args):
+    """Data operations for array/object proxies, separate from member discovery."""
+    if isinstance(value, list):
+        if operation == "item_length":
+            return len(value)
+        if operation == "item_keys":
+            return [str(i) for i in range(len(value))]
+        if operation == "item_resize":
+            length = int(args[0])  # JS accepts -0 as an Array length.
+            if length < len(value):
+                del value[length:]
+            else:
+                value.extend([_native.undefined] * (length - len(value)))
+            return None
+        index = int(args[0])
+        if operation == "item_has":
+            return 0 <= index < len(value)
+        if operation == "item_get":
+            return value[index] if index < len(value) else _native.undefined
+        if operation == "item_set":
+            if index >= len(value):
+                value.extend([_native.undefined] * (index + 1 - len(value)))
+            value[index] = args[1]
+        elif operation == "item_delete":
+            if index < len(value):
+                value[index] = _native.undefined
+        else:
+            raise ValueError(f"Unknown container operation: {operation}")
+        return None
+    if operation == "item_keys":
+        # Object property order: array indices first, then other string keys.
+        keys = [key for key in value if isinstance(key, str)]
+        indices = {
+            key
+            for key in keys
+            if len(key) <= 10
+            and key.isascii()
+            and key.isdigit()
+            and str(int(key)) == key
+            and int(key) < 2**32 - 1
+        }
+        return sorted(indices, key=int) + [key for key in keys if key not in indices]
+    key = args[0]
+    if operation == "item_has":
+        return key in value
+    if operation == "item_get":
+        return value.get(key, _native.undefined)
+    if operation == "item_set":
+        value[key] = args[1]
+    elif operation == "item_delete":
+        value.pop(key, None)
+    else:
+        raise ValueError(f"Unknown container operation: {operation}")
+    return None
 
 
 def validate(value):

@@ -152,7 +152,7 @@ async def test_promise_result_rejection_timeout_and_cancellation_cleanup():
     page = view(rt)
     cancelled = asyncio.Event()
 
-    async def evaluate(source):
+    async def evaluate(source, *, copy=False):
         if source == "42":
             return 42
         if source == "reject":
