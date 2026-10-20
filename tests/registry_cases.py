@@ -53,6 +53,7 @@ async def main():
         await driver.page(second).load_html(html)
         assert first.evaluate("answer") == second.evaluate("answer") == 42
         assert first.evaluate("app.model.items === app.model.items")
+        assert first.evaluate("globalThis.items=[]; app.echo(items)===items")
         assert first.evaluate("Python.getitem(app.model.items,0)") == 1
         api.register(lambda value: value + 2, name="plus")
         assert first.evaluate("app.plus(40)") == second.evaluate("app.plus(40)") == 42

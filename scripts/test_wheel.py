@@ -31,16 +31,17 @@ assert (package / 'images.pyi').is_file()
 assert (package / 'appcore/__init__.pyi').is_file()
 assert (package / 'api/__init__.pyi').is_file()
 assert (package / 'registry.pyi').is_file()
-from ultralight_py import API, Application, Window, Runtime, Session, View, JSValue, PixelBuffer
+from ultralight_py import API, Application, Window, Runtime, Session, View, JSArray, JSObject, JSValue, PixelBuffer
 from ultralight_py.api.runtime import Runtime as ModuleRuntime, Session as ModuleSession
 from ultralight_py.api.view import View as ModuleView
-from ultralight_py.api.values import JSValue as ModuleJSValue, PixelBuffer as ModulePixelBuffer
+from ultralight_py.api.values import JSArray as ModuleJSArray, JSObject as ModuleJSObject, JSValue as ModuleJSValue, PixelBuffer as ModulePixelBuffer
 from ultralight_py.appcore.application import Application as ModuleApplication
 from ultralight_py.appcore.window import Window as ModuleWindow
 assert (Runtime, Session, View, JSValue, PixelBuffer, Application, Window) == (
     ModuleRuntime, ModuleSession, ModuleView, ModuleJSValue, ModulePixelBuffer,
     ModuleApplication, ModuleWindow,
 )
+assert (JSArray, JSObject) == (ModuleJSArray, ModuleJSObject)
 print('Installed wheel:', package)
 """
     subprocess.run([sys.executable, "-I", "-c", probe], cwd=directory, env=env, check=True)
