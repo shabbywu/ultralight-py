@@ -8,7 +8,7 @@ Ultralight 2.x 的 Python 绑定，用于离屏渲染、AppCore 原生窗口，�
 - **独立 API 注册表**：装饰器注册函数、导出对象、加载前附着与导航恢复。
 - **离屏渲染**：加载 HTML 或网页，执行 JavaScript，读取 CPU 像素帧。
 - **Session 隔离**：同账号多 View 共享浏览器存储，不同 Session 隔离；支持临时和持久化存储，见 [示例](examples/sessions.py)。
-- **双向桥接**：Python 函数、对象与实时容器代理，支持 Promise / asyncio。
+- **双向桥接**：Python 函数与对象，list/dict ↔ Array/Object 双向共享，支持原生 JS 容器操作与 Promise / asyncio。
 - **页面交互**：页面事件与等待、鼠标键盘输入、自定义资源加载，以及可选的 Tkinter 输入适配。
 
 ## 安装

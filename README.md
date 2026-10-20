@@ -8,7 +8,7 @@ Python bindings for Ultralight 2.x, supporting offscreen rendering, native AppCo
 - **Standalone API registry**: decorator-based function registration, exported objects, attachment before loading, and restoration after navigation.
 - **Offscreen rendering**: load HTML or web pages, execute JavaScript, and read CPU pixel frames.
 - **Session isolation**: views in the same session share browser storage, while separate sessions stay isolated. Temporary and persistent storage are supported; see the [example](examples/sessions.py).
-- **Bidirectional bridge**: Python functions, objects and live container proxies, with Promise / asyncio support.
+- **Bidirectional bridge**: Python functions and objects, shared list/dict ↔ Array/Object containers with native JS operations, and Promise / asyncio support.
 - **Page interaction**: page events and waits, mouse and keyboard input, custom resource loading, and an optional Tkinter input adapter.
 
 ## Installation

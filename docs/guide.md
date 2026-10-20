@@ -121,7 +121,7 @@ with view.evaluate_handle("({offset:10, add(n){return this.offset+n}})") as obj:
 `get(str_or_int)`、`set(key, value)`、`keys()`、`call(*args, this=None)` 和 `to_python()`。
 `get()` 和 `call()` 返回句柄，显式指定 `this` 可保留方法的接收对象。
 `set()`/`call()` 的单个值以及 Python 可调用对象的返回值可以是同文档 JSValue。
-实时 Python 容器中的 JSValue 也会在访问时检查所属文档；显式按值复制不转换 JSValue。
+实时 Python 容器中的 JSValue 也会在访问时检查所属文档；显式按值复制只接受基础数据和容器，不复制函数、Promise 等特殊对象。
 
 | Python | JavaScript |
 | --- | --- |
@@ -130,15 +130,16 @@ with view.evaluate_handle("({offset:10, add(n){return this.offset+n}})") as obj:
 | bool | Boolean |
 | int、float | Number；JS 安全整数返回 int，其余返回 float |
 | str | String，保留 Unicode 和内嵌 NUL |
-| list、tuple | 实时 Python 代理；普通 JS Array 回传时复制为 list |
-| dict | 实时 Python 映射代理，保留 Python 键类型 |
+| list | JS Array 代理；JS 原生 Array 在 Python 中为共享 JSArray 视图 |
+| tuple | Python 只读代理，使用高级 Python 索引接口 |
+| dict | JS Object 代理，属性访问字符串键；JS 原生对象在 Python 中为共享 JSObject 视图 |
 | 普通实例、callable | 属性/方法代理或可调用代理；回传时恢复原对象 |
 
-Python int 必须位于 ±(2⁵³−1)，不进行隐式字符串/数字转换。JS 数组与普通对象递归转换为
-list/dict；函数、Promise、Date 等原生 JS 特殊对象通过 JSValue 使用。普通 JS 容器的循环引用或超过
-64 层的转换报 `TraversalLimit`，按值转换不保留对象别名。Python 代理支持循环引用，
-回传 Python 时恢复原对象。
-对象转换会读取自有可枚举字符串属性，可能执行 getter；`keys()` 不读取属性值。
+Python int 必须位于 ±(2⁵³−1)，不进行隐式字符串/数字转换。可变容器默认共享引用，
+支持嵌套、循环引用和别名。函数、Promise、Date 等 JS 特殊对象通过 JSValue 使用。
+需要独立基础数据时使用 evaluate(..., copy=True) 或 value.to_python(copy=True)；
+显式深复制拒绝循环引用或超过 64 层的数据，不保留对象别名。
+JSObject 读取自有可枚举字符串属性，可能执行 getter；keys() 不读取属性值。
 
 
 ## Python 对象与实时容器
@@ -169,11 +170,10 @@ left_binding.close()
 文档级绑定需在主框架导航后重新创建；独立 API 注册表自动恢复。
 View 保留 PythonBinding 会话，丢弃句柄不会解除绑定。
 
-Python list/dict/tuple 统一使用实时代理，
-包括函数返回值和 JSValue 的参数。JS 使用 Python 的 `append`、`get` 等方法，
-严格索引使用 `Python.getitem/setitem/delitem`，不模拟 JS Array/Object。
-需要普通 JS 数据时使用 `Python.to_value()` 显式复制。
-完整 API、身份和释放规则见 [对象桥接](objects.md)。
+Python list/dict 与 JS Array/普通对象默认双向共享，包括函数参数、返回值和属性。
+JS 使用索引、length、push、map、Object.keys 和 JSON.stringify；无需先转换为快照。
+JS 创建的容器在 Python 中使用 JSArray/JSObject 视图，显式 copy=True 才生成独立 list/dict。
+完整 API、稠密数组规则、非字符串字典键及释放规则见 [对象桥接](objects.md)。
 
 
 ## 资源加载

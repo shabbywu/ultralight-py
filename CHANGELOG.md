@@ -1,6 +1,14 @@
 # 更新日志
 
-## 0.5.0（待发布）
+## 0.6.0（待发布）
+
+- **Breaking**：可变容器默认双向共享。Python list/dict 在 JS 中支持索引、length、原生 Array 方法、Object 枚举与直接 JSON 序列化；JS Array/普通对象在 Python 中为 JSArray/JSObject 容器视图。
+- evaluate、evaluate_async、ScriptPage.evaluate 和 to_python 增加 copy=True，显式生成独立的 Python list/dict；默认共享路径支持别名、循环引用和跨语言混合容器。
+- Python list 保持稠密，空位使用 undefined 填充；dict 的 JS 属性仅对应字符串键，非字符串键通过高级 Python 接口访问。
+- list/dict 属性不再暴露 Python 方法，改用 Python.getattr；JSON.stringify 无需 Python.to_value。迁移细节见 [对象桥接](docs/objects.md#显式复制与-060-迁移)。
+- 容器视图独立保留句柄，身份缓存使用弱引用，保留绑定隔离、文档失效与线程检查。
+
+## 0.5.0
 
 - Windows wheel 修复时排除由系统加载器解析的 `ext-ms-win-*` API set，避免分析 AppCore DLL 依赖时因找不到对应文件而失败。
 - 将 API 和 AppCore 按职责拆分为公开子模块，支持 `api.runtime`、`api.view`、`api.values`、`appcore.application` 和 `appcore.window` 导入。

@@ -30,7 +30,7 @@ Runtime 更新或 AppCore 步进返回原生调用后才重检条件谓词；Vie
 导入统一放在模块顶部并使用绝对路径。相互引用的模块先导入模块对象，
 在函数运行时访问类型属性，避免初始化期间读取尚未定义的类型。
 原生调用共用 `_support.py` 的主线程入口与清理机制，输入与绑定关闭不反向依赖公开 api 模块。
-`_objects.unwrap()` 通过 `_api.JSValue` 识别公共句柄；模块初始化时不读取尚未定义的类型。
+`_objects.unwrap()` 通过 `_api.JSValue/JSArray/JSObject` 识别公共句柄及容器视图；模块初始化时不读取尚未定义的类型。
 
 `api/__init__.pyi`、`input.pyi`、`objects.pyi`、`events.pyi`、`scripting.pyi` 分别描述对应模块，根类型声明定义原生公开类型并重新导出 Python API 类型，
 避免根入口与模块入口出现两个不同的静态类型。Tk 适配器拥有独立类型声明。
@@ -56,7 +56,10 @@ AppCore 的应用、窗口和注册入口分别位于 `appcore/application.hpp`�
 | `document.hpp` | 文档初始化、生命周期守卫与通用转换入口接线 |
 | `async.hpp` | Python 可等待对象 的 JS Promise、会话撤销与 SDK PostTask 投递 |
 
-`conversion.hpp` 保留基础按值转换，循环和深度限制复用 ulbind17 Traversal。
+`conversion.hpp` 区分默认共享转换、显式深复制和内部参数列表解包。仅显式深复制使用 ulbind17 Traversal 的循环和深度限制。
+Python list/dict 使用专用 Array/Object Proxy；api.values 中的 JSArray/JSObject 通过独立 HostValue 句柄实现 Python 容器协议。
+Document 弱引用 HostView，并持有 Python WeakValueDictionary；JS WeakMap 分配对象身份，避免身份缓存强持有 Python 视图。
+回传代理恢复其原始对象。JS 数组检测使用捕获的 Array.isArray，SDK 的 JSC C API 不识别数组 Proxy。
 公共 Python `bind_function()` 校验对象是否可调用，原生层统一使用 bind_object 绑定。
 
 ## 所有权和清理

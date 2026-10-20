@@ -32,9 +32,9 @@ with Runtime() as runtime, runtime.create_view(320, 180) as view:
     view.load_html("""<script>
             left.increment(2);
             Python.call(right.increment, [], {amount: 3});
-            left.history.append(9);
+            left.history.push(9);
             window.savedLeft = left;
-            window.output = Python.to_value(left.history);
+            window.output = [...left.history];
         </script><body>Python objects</body>""")
     deadline = time.monotonic() + 5
     while not ready:

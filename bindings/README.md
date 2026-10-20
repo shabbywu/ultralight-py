@@ -14,7 +14,7 @@
 - `images/`：`conversion.hpp` 实现 BGRA、行跨度与去预乘转换；`bindings.hpp` 注册转换接口。
   转换使用独立 bytes，不访问 Renderer，像素循环释放 GIL。
 - `input/`：通用鼠标、滚动、键盘和焦点转发，以及事件转换与 GIL 管理。
-- `javascript/`：基础类型转换、保留句柄、属性访问和函数调用及注册。
+- `javascript/`：基础类型及共享容器转换、显式复制、保留句柄、属性访问和函数调用及注册。
 - `javascript/objects/`：文档与绑定会话、代理工厂、对象身份及 Python 运算回调。
   状态、代理、迭代、运算入口和文档初始化分别位于 `state.hpp`、`proxy.hpp`、
   `iteration.hpp`、`operators.hpp` 和 `document.hpp`。

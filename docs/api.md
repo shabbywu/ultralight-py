@@ -42,7 +42,7 @@ Application/Window 与独立 API 注册表的完整接口见 [窗口与注册表
 | `wait_ready(timeout=5)`、`wait_settled(timeout=5)` | 被动异步等待，成功返回 None |
 | `wait_until(predicate, timeout=5)` | 被动等待同步谓词，返回首个真值结果 |
 | `wait_for_selector(selector, timeout=5)` | 等待主文档中元素存在，返回 True；不判断可见性 |
-| `evaluate(source)` | 求值并转换为 Python 值；不负责等待页面加载 |
+| `evaluate(source, *, copy=False)` | 求值；容器默认共享，copy=True 递归复制；不负责等待页面加载 |
 | `evaluate_handle(source)` | 保留当前文档的 JSValue |
 | `bind_object(name, instance, *, members=None)` | 返回 PythonBinding；名称为非空字符串，不能为保留名 Python |
 | `bind_function(name, callback)` | 可调用对象专用入口，返回 PythonBinding，保留原对象的身份 |
@@ -159,14 +159,19 @@ await page.wait_for_selector("#result")
 | `JSValue.set(key, value)` | 设置属性；基础值、Python 实时代理、同文档 JSValue 均可传入 |
 | `JSValue.keys()` | 自有可枚举字符串属性名 list，不读取属性值 |
 | `JSValue.call(*args, this=None)` | 结果句柄；this 可传同文档 JSValue，保留 JS 方法的接收对象 |
-| `JSValue.to_python()` | 基础值及普通 JS 容器按值转换；Python 代理恢复原对象 |
-| `JSValue.close()`、`closed` | closed 表示显式关闭，不能用于判断导航失效 |
+| `JSValue.to_python(*, copy=False)` | 容器默认共享；copy=True 递归复制为独立 Python 基础数据 |
+| `JSValue.close()`、`closed` | closed 表示显式关闭、文档失效或 View 已关闭 |
 | `PythonBinding.close()`、`closed` | 撤销该绑定导出的全部代理；导航/关闭也会令 closed 为 true |
 
 两种句柄均支持 `with`。丢弃 PythonBinding 不自动解绑；丢弃 JSValue 会释放保留句柄，
 释放可能延迟到主线程调用。没有通用 `valid` 属性；操作时检查文档有效性。
 同一 Python 可调用对象通过 `bind_function/bind_object` 导出后，回传时恢复原对象。
 不同显式绑定仍拥有独立的代理身份和撤销范围。
+
+JSArray（MutableSequence）与 JSObject（MutableMapping）由求值、回调和属性访问自动生成，
+支持 close/closed、with 和 to_python(copy=True)。JSObject 仅操作自有可枚举字符串属性。
+View.evaluate_async 和 ScriptPage.evaluate 同样接受关键字参数 copy=False。
+共享视图、混合键及迁移规则见 [对象桥接](objects.md)。
 
 ## 图像输出
 
@@ -206,7 +211,7 @@ ErrorCode 是原生枚举，支持名称属性 `.name`、数值 `.value` 和 `in
 | CrossContext | JSValue 属于另一文档，或 Session/View 属于另一 Runtime |
 | Busy | 重入 Renderer、输入，或在资源回调中操作引擎 |
 | ScriptException | JS 执行失败，对应 JavaScriptError |
-| TraversalLimit | 普通 JS 容器或按值复制存在循环/超过深度限制 |
+| TraversalLimit | 显式按值复制存在循环/超过深度限制 |
 | Unsupported | AppCore Runtime 被手动驱动，或从加速 View 读取 CPU 像素 |
 
 Python 参数校验还可能直接抛 TypeError、ValueError、OverflowError。
