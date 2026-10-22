@@ -25,8 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "site"
 OUTPUT = ROOT / "dist"
 REPOSITORY = "https://github.com/shabbywu/ultralight-py"
-CONFIG = json.loads((SOURCE / "config.json").read_text(encoding="utf-8"))
-BASE_URL = CONFIG["base_url"].rstrip("/")
+BASE_URL = "https://ultralight-py.shabbywu.cn"
 PAGES = (
     (
         "getting-started",
