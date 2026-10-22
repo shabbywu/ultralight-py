@@ -28,9 +28,10 @@ python -m http.server 8000 --directory dist
 - `site/index.html`、`site/en/index.html`：中英文首页、API 索引和 Showcase 链接。
 - `site/locales/zh-CN.json`、`site/locales/en.json`：导航、搜索、复制提示和无障碍标签等界面文案。
 - `site/layout.html`：公共页头、页脚和搜索弹窗。
-- `site/config.json`：正式站点的 HTTPS 域名，用于 canonical、语言替代链接、站点地图和 robots.txt。
 - `site/assets/`：样式、脚本和图标；语法高亮 CSS 在构建时生成。
 - `scripts/build_site.py`：页面清单、Markdown 渲染、链接转换、页内目录和搜索索引生成。
+
+正式公开地址由 `scripts/build_site.py` 的 `BASE_URL` 常量指定，用于 canonical、语言替代链接、站点地图和 robots.txt。
 
 新增文档时同时加入 `PAGES` 和 `EN_PAGES`，再按用途调整侧栏分组。
 中英文同一文档的标题层级和顺序须一一对应；构建会检查并生成对应章节的锚点映射，语言切换时保留章节位置。
@@ -48,25 +49,19 @@ PR 仅构建站点。无需拉取子模块或构建 Python 绑定。
 默认部署地址：[中文](https://ultralight-py.shabbywu.cn/zh-CN/) · [English](https://ultralight-py.shabbywu.cn/en/)。
 首次启用 Pages 后可手动运行 **Documentation Pages** 工作流。
 
-## 自定义域名
+## 反向代理与公开域名
 
-正式域名为 `ultralight-py.shabbywu.cn`，构建配置位于 `site/config.json`。
-部署路径为域名根目录，不再包含 `/ultralight-py/`。
+正式入口为 `https://ultralight-py.shabbywu.cn/`，通过其他站点反向代理中转到 GitHub Pages。
+GitHub Pages 使用原有项目地址 `https://shabbywu.github.io/ultralight-py/` 作为源站。
+域名、证书与回源配置由代理及中转站管理；Pages 的 Custom domain 保持为空。
 
-1. 在仓库 **Settings → Pages → Custom domain** 填写 `ultralight-py.shabbywu.cn` 并保存。
-2. 若直接使用 GitHub Pages，在 `shabbywu.cn` 的 DNS 中添加：
+公开入口使用域名根路径，回源时由代理链路映射到源站的 `/ultralight-py/` 前缀，例如
+`/en/api.html` 最终对应源站 `/ultralight-py/en/api.html`。
+静态资源和搜索索引使用相对路径；canonical、hreflang、og:url 和 sitemap 始终使用 `BASE_URL` 中的公开域名。
+代理应提供有效的 HTTPS 证书，并公开转发 `/robots.txt`、`/sitemap.xml` 和页面、资源请求。
+若中转站有自己的 robots.txt，需要让公开域名的 `/robots.txt` 声明本站的 sitemap 地址。
 
-   | 类型 | 主机记录 | 目标 |
-   | --- | --- | --- |
-   | CNAME | `ultralight-py` | `shabbywu.github.io` |
-
-   若保留 EdgeOne 等 CDN，由 CDN 将该域名的请求回源至此 Pages 站点，保留正确路径和 HTTPS，
-   并确保 HTML、`robots.txt` 和 `sitemap.xml` 可以被公开访问。
-3. 直连 Pages 时等待 DNS 和证书生效后，在 Pages 设置启用 **Enforce HTTPS**。
-
-构建会生成 `dist/CNAME`，供按分支发布时使用。
-当前使用自定义 GitHub Actions 发布，GitHub 会忽略该文件；**仍须在 Pages 设置中绑定域名**。
-参考 [GitHub 自定义域名文档](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site)。
+构建会清理旧产物中的 `CNAME` 文件，避免遗留之前的 Pages 域名配置。
 
 ## 站点地图与 Google Search Console
 

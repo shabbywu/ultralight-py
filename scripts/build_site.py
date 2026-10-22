@@ -147,8 +147,8 @@ def write_search_metadata() -> int:
     (OUTPUT / "robots.txt").write_text(
         f"User-agent: *\nAllow: /\n\nSitemap: {BASE_URL}/sitemap.xml\n", encoding="utf-8"
     )
-    # Useful for branch-based publishing; Actions-based Pages still needs Settings → Pages.
-    (OUTPUT / "CNAME").write_text(f"{urlsplit(BASE_URL).hostname}\n", encoding="utf-8")
+    # The public domain is served by a reverse proxy, independently of Pages hosting.
+    (OUTPUT / "CNAME").unlink(missing_ok=True)
     return count
 
 
@@ -424,7 +424,7 @@ def build() -> None:
         or origin.query
         or origin.fragment
     ):
-        raise ValueError("site/config.json base_url must be an HTTPS origin without a path")
+        raise ValueError("BASE_URL must be an HTTPS origin without a path")
     if set(MESSAGES["zh-CN"]) != set(MESSAGES["en"]):
         raise ValueError("Both locale catalogs must contain exactly the same UI keys")
     if [page[0] for page in PAGES] != [page[0] for page in EN_PAGES]:
