@@ -4,6 +4,8 @@
 
 Ultralight 2.x 的 Python 绑定，用于离屏渲染、AppCore 原生窗口，以及在 Python 与 JavaScript 之间共享函数和对象。
 
+[中文文档](https://ultralight-py.shabbywu.cn/zh-CN/) · [English docs](https://ultralight-py.shabbywu.cn/en/) · [API 文档](https://ultralight-py.shabbywu.cn/zh-CN/api.html) · [示例展示](https://shabbywu.github.io/ultralight-py-showcase/zh-CN/)
+
 - **原生窗口**：AppCore 系统字体、DPI、输入与 IME，共用 asyncio 循环，见 [窗口指南](docs/appcore.md)。
 - **独立 API 注册表**：装饰器注册函数、导出对象、加载前附着与导航恢复。
 - **离屏渲染**：加载 HTML 或网页，执行 JavaScript，读取 CPU 像素帧。
@@ -63,6 +65,8 @@ Python 负责游戏规则，JavaScript Canvas 负责画面与 UI，通过注册�
 运行方式、操作说明和下载入口见 [Emberkeep README](https://github.com/shabbywu/emberkeep/blob/main/README.zh-CN.md)。
 
 ## 文档与示例
+
+在线阅读[中英双语文档站](https://ultralight-py.shabbywu.cn/zh-CN/)，支持语言切换及 API 与指南全文搜索；完整应用、原生运行效果和示例源码见 [Showcase](https://shabbywu.github.io/ultralight-py-showcase/zh-CN/)。
 
 - [使用指南](https://github.com/shabbywu/ultralight-py/blob/main/docs/guide.md)：页面事件、桥接、资源加载、像素与输入。
 - [公开 API](https://github.com/shabbywu/ultralight-py/blob/main/docs/api.md) · [对象桥接](https://github.com/shabbywu/ultralight-py/blob/main/docs/objects.md)。

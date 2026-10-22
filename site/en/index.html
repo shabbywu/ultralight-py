@@ -1,0 +1,56 @@
+<main class="shell" id="content">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="eyebrow">PYTHON × WEB × NATIVE</p>
+      <h1 id="hero-title">Build with the web.<br><span>Drive it with Python.</span></h1>
+      <p class="lead">Python bindings for Ultralight 2.x. Bring HTML, CSS, and JavaScript to the native desktop, with application logic written in Python.</p>
+      <div class="actions"><a class="button" href="getting-started.html">Get started →</a><a class="button outline" href="api.html">API reference</a></div>
+      <p class="hero-meta">Python 3.10+ <span>／</span> Windows · Linux · macOS</p>
+    </div>
+    <div class="hero-art" role="img" aria-label="Python and JavaScript connect through Ultralight to render web interfaces in native windows">
+      <div class="window window-back"><span>● ● ●</span></div>
+      <div class="window window-middle"><span>● ● ●</span></div>
+      <div class="window window-front"><div class="bridge-words"><b>Python</b><em>↔</em><b>JavaScript</b></div><small>ULTRALIGHT / NATIVE DESKTOP</small><div class="bridge-tags"><span>objects</span><span>functions</span><span>promises</span></div></div>
+      <p class="art-caption">HTML / CSS<br>Python / asyncio<br>One application<i></i></p>
+    </div>
+  </section>
+  <div class="install-bar"><span class="mono">INSTALL</span><pre><code>python -m pip install ultralight-py</code></pre><a href="getting-started.html#installation">Installation →</a></div>
+  <section class="overview" aria-labelledby="overview-title">
+    <div class="section-head"><div><p class="eyebrow">01 / THE TOOLKIT</p><h2 id="overview-title">A window. A bridge. Your application.</h2></div><p>Interface, logic, and data working together.</p></div>
+    <div class="feature-grid">
+      <a class="feature" href="appcore.html"><span class="feature-number">01 / WINDOW</span><h3>Native windows, web UI <span>↗</span></h3><p>AppCore handles system fonts, DPI, keyboard, mouse, and IME. Shape your interface with HTML and CSS.</p><span class="feature-api">Application · Window</span></a>
+      <a class="feature" href="objects.html"><span class="feature-number">02 / BRIDGE</span><h3>Two languages, shared objects <span>↗</span></h3><p>Register Python functions and objects for direct JavaScript calls. Share live containers and turn async results into Promises.</p><span class="feature-api">API · JSValue · JSArray</span></a>
+      <a class="feature" href="guide.html#pixels"><span class="feature-number">03 / RENDER</span><h3>Offscreen rendering, your host <span>↗</span></h3><p>Load pages, run scripts, and read pixels. Integrate with an existing GUI or export Pillow images and NumPy arrays.</p><span class="feature-api">Runtime · View · PixelBuffer</span></a>
+    </div>
+  </section>
+  <section class="quickstart" aria-labelledby="quickstart-title">
+    <div class="section-head"><div><p class="eyebrow">02 / YOUR FIRST APPLICATION</p><h2 id="quickstart-title">Start with a few lines.</h2></div><a class="text-link" href="getting-started.html">Complete quick start →</a></div>
+    <div class="quickstart-grid">
+      <div class="quickstart-copy"><h3>One window. A call across languages.</h3><p>Register a Python function, attach the API to the window's View, then load the page. JavaScript calls functions directly from the namespace.</p><p>AppCore drives the window loop. Offscreen scripts can opt into <code>ScriptDriver.auto()</code>.</p><a class="text-link" href="appcore.html#registration-and-restoration">API registration and navigation restoration →</a><div class="note">Examples run in local Python. Wheels include the engine and runtime resources, so no separate SDK download is needed.</div></div>
+      <div class="quickstart-code"><div class="code-label"><span>hello.py</span><span>PYTHON</span></div>{{QUICKSTART_CODE}}</div>
+    </div>
+  </section>
+  <section class="reference-section" aria-labelledby="reference-title">
+    <div class="section-head"><div><p class="eyebrow">03 / THE REFERENCE</p><h2 id="reference-title">Find the interface you need.</h2></div><a class="text-link" href="api.html">All APIs →</a></div>
+    <div class="reference-grid">
+      <a href="api.html#runtime"><code>Runtime / View</code><span>Engine lifecycle, page loading, and evaluation</span><b>→</b></a>
+      <a href="appcore.html"><code>Application / Window</code><span>Native windows, layout, DPI, and application loops</span><b>→</b></a>
+      <a href="appcore.html#registration-and-restoration"><code>API</code><span>Function registration, object exports, and restoration</span><b>→</b></a>
+      <a href="api.html#jsvalue-and-pythonbinding"><code>JSValue / PythonBinding</code><span>Cross-language handles, bindings, and revocation</span><b>→</b></a>
+      <a href="api.html#optional-script-driver"><code>ScriptDriver / ScriptPage</code><span>Async loading, page waits, and script driving</span><b>→</b></a>
+      <a href="api.html#session"><code>Session</code><span>Isolated browser storage and persistent sessions</span><b>→</b></a>
+      <a href="objects.html#js-container-views-in-python"><code>JSArray / JSObject</code><span>Live containers, references, and explicit snapshots</span><b>→</b></a>
+      <a href="api.html#image-output"><code>PixelBuffer / RGBAImage</code><span>Pixel capture, Pillow, and NumPy output</span><b>→</b></a>
+    </div>
+  </section>
+  <section class="showcase" aria-labelledby="showcase-title">
+    <div class="section-head"><div><p class="eyebrow">04 / BUILT WITH ULTRALIGHT-PY</p><h2 id="showcase-title">See it all come together.</h2></div><a class="text-link" href="https://shabbywu.github.io/ultralight-py-showcase/en/">Explore the Showcase ↗</a></div>
+    <p class="section-description">From bridge experiments to desktop games: see native recordings, implementation ideas, and source code.</p>
+    <div class="showcase-grid">
+      <a href="https://shabbywu.github.io/ultralight-py-showcase/en/#bridge-lab"><span>BRIDGE / INTEROP</span><h3>Bridge Lab ↗</h3><p>An editable lab for functions, Promises, live objects, and containers.</p></a>
+      <a href="https://shabbywu.github.io/ultralight-py-showcase/en/#emberkeep"><span>CANVAS / GAME</span><h3>Emberkeep ↗</h3><p>A pixel dungeon with Python game rules and a Canvas interface.</p></a>
+      <a href="https://shabbywu.github.io/ultralight-py-showcase/en/#pianoscope"><span>MUSIC / VISUALIZATION</span><h3>PianoScope ↗</h3><p>Sheet music, falling notes, and real piano sound in one application.</p></a>
+      <a href="https://shabbywu.github.io/ultralight-py-showcase/en/#ashen-reliquary"><span>VUE / INVENTORY</span><h3>Ashen Reliquary ↗</h3><p>Python manages inventory and equipment rules; Vue presents the UI.</p></a>
+    </div>
+  </section>
+</main>

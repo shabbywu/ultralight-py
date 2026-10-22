@@ -62,7 +62,7 @@ python -m pytest tests -q
   获得及时释放；`atexit` 会在解释器退出前关闭 Runtime。回调捕获 View/Runtime 时可能形成
   Python 与原生对象之间的引用环，显式关闭会解除回调引用。
 - JSValue 保留当前文档中的值；主框架导航或关闭 View 后旧句柄报 `PageGone`，
-  不能传入其他 View/文档。`JSValue.closed` 只表示该句柄已被显式关闭，不能用它判断导航失效。
+  不能传入其他 View/文档。`JSValue.closed` 表示显式关闭、文档失效或 View 已关闭；操作时仍会检查文档有效性。
 - 更新或渲染回调中允许关闭 View、导航和替换回调，不能嵌套驱动 Renderer。
   JS 执行中的导航/关闭可能使当前求值报 `PageGone`。
 

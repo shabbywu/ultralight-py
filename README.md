@@ -4,7 +4,9 @@ English · [简体中文](README.zh-CN.md)
 
 Python bindings for Ultralight 2.x, supporting offscreen rendering, native AppCore windows, and shared functions and objects between Python and JavaScript.
 
-- **Native windows**: AppCore system fonts, DPI, input and IME, sharing an asyncio loop. See the [window guide](docs/appcore.md).
+[Documentation](https://ultralight-py.shabbywu.cn/en/) · [API reference](https://ultralight-py.shabbywu.cn/en/api.html) · [中文文档](https://ultralight-py.shabbywu.cn/zh-CN/) · [Showcase](https://shabbywu.github.io/ultralight-py-showcase/en/)
+
+- **Native windows**: AppCore system fonts, DPI, input and IME, sharing an asyncio loop. See the [window guide](docs/en/appcore.md).
 - **Standalone API registry**: decorator-based function registration, exported objects, attachment before loading, and restoration after navigation.
 - **Offscreen rendering**: load HTML or web pages, execute JavaScript, and read CPU pixel frames.
 - **Session isolation**: views in the same session share browser storage, while separate sessions stay isolated. Temporary and persistent storage are supported; see the [example](examples/sessions.py).
@@ -21,7 +23,7 @@ python -m pip install ultralight-py
 
 Release wheels include the Ultralight shared libraries and runtime resources; no separate SDK installation is required.
 CI targets Windows x64, Linux x64 (glibc ≥ 2.34), and macOS ARM64 (11.3+).
-Available wheels depend on the release. For installation from source, see the [development guide](https://github.com/shabbywu/ultralight-py/blob/main/docs/development.md).
+Available wheels depend on the release. For installation from source, see the [development guide](docs/en/development.md).
 
 ## Quick start
 
@@ -52,7 +54,7 @@ with Runtime() as runtime:
 
 Engine operations run on Python's main thread. This example uses `ScriptDriver.auto()` to advance the page;
 when integrating with an existing GUI or host loop, you can drive the Runtime yourself. Pixels use BGRA8 with premultiplied alpha.
-`frame.to_rgba()` returns an independent RGBA image; optional Pillow/NumPy output is covered in the [pixel guide](docs/guide.md#像素).
+`frame.to_rgba()` returns an independent RGBA image; optional Pillow/NumPy output is covered in the [pixel guide](docs/en/guide.md#pixels).
 
 ## Game demo
 
@@ -64,10 +66,12 @@ See the [Emberkeep README](https://github.com/shabbywu/emberkeep/blob/main/READM
 
 ## Documentation and examples
 
-The detailed guides below are currently in Chinese.
+Documentation is available in English and Simplified Chinese, with a language switch on every page.
 
-- [User guide](https://github.com/shabbywu/ultralight-py/blob/main/docs/guide.md): page events, bridging, resource loading, pixels, and input.
-- [Public API](https://github.com/shabbywu/ultralight-py/blob/main/docs/api.md) · [Object bridging](https://github.com/shabbywu/ultralight-py/blob/main/docs/objects.md).
+Read the [documentation site](https://ultralight-py.shabbywu.cn/en/) for searchable guides and API documentation, and visit the [Showcase](https://shabbywu.github.io/ultralight-py-showcase/en/) for complete applications, recordings, and source links.
+
+- [User guide](docs/en/guide.md): page events, bridging, resource loading, pixels, and input.
+- [Public API](docs/en/api.md) · [Object bridging](docs/en/objects.md).
 - [Examples](https://github.com/shabbywu/ultralight-py/tree/main/examples): offscreen rendering, bidirectional bridging, virtual resources, asyncio, and Tkinter.
-- [Development guide](https://github.com/shabbywu/ultralight-py/blob/main/docs/development.md) · [Architecture](https://github.com/shabbywu/ultralight-py/blob/main/docs/architecture.md) · [Release guide](https://github.com/shabbywu/ultralight-py/blob/main/docs/releasing.md).
-- [Changelog](https://github.com/shabbywu/ultralight-py/blob/main/CHANGELOG.md).
+- [Development guide](docs/en/development.md) · [Architecture](docs/en/architecture.md) · [Release guide](docs/en/releasing.md).
+- [Changelog](docs/en/changelog.md).

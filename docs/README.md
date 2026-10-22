@@ -1,5 +1,7 @@
 # 项目文档
 
+[中文在线文档](https://ultralight-py.shabbywu.cn/zh-CN/) · [English docs](https://ultralight-py.shabbywu.cn/en/) · [English Markdown](en/README.md) · [Showcase 示例](https://shabbywu.github.io/ultralight-py-showcase/zh-CN/)
+
 ## 使用项目
 
 - 项目介绍与快速开始：[English](../README.md) · [简体中文](../README.zh-CN.md)
@@ -15,3 +17,4 @@
 - [架构与维护约定](architecture.md)：模块职责、所有权和清理边界。
 - [原生绑定模块](../bindings/README.md)：C++ 目录与注册入口。
 - [发布指南](releasing.md)：多平台 CI、发行包验收和审批发布。
+- [文档站维护](../site/README.md)：本地构建、内容维护与 GitHub Pages 部署。
